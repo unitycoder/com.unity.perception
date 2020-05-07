@@ -23,15 +23,21 @@ namespace UnityEngine.Perception.Sensors
         Camera m_CameraRenderingToSource;
 
         ProfilerMarker m_WaitingForCompletionMarker = new ProfilerMarker("RenderTextureReader_WaitingForCompletion");
+        ReadbackMode m_ReadbackMode;
 
-        public RenderTextureReader(RenderTexture source, Camera cameraRenderingToSource, Action<int, NativeArray<T>, RenderTexture> imageReadCallback)
+        public RenderTextureReader(RenderTexture source, Camera cameraRenderingToSource, Action<int, NativeArray<T>, RenderTexture> imageReadCallback, ReadbackMode readbackMode = ReadbackMode.Async)
         {
             this.m_Source = source;
             this.m_ImageReadCallback = imageReadCallback;
             this.m_CameraRenderingToSource = cameraRenderingToSource;
             m_NextFrameToCapture = Time.frameCount;
 
+            m_ReadbackMode = readbackMode;
+
             if (!GraphicsUtilities.SupportsAsyncReadback())
+                m_ReadbackMode = ReadbackMode.Synchronous;
+
+            if (m_ReadbackMode == ReadbackMode.Synchronous)
                 m_CpuTexture = new Texture2D(m_Source.width, m_Source.height, m_Source.graphicsFormat, TextureCreationFlags.None);
 
             RenderPipelineManager.endFrameRendering += OnEndFrameRendering;
@@ -51,25 +57,31 @@ namespace UnityEngine.Perception.Sensors
 
             m_NextFrameToCapture = Time.frameCount + 1;
 
-            if (!GraphicsUtilities.SupportsAsyncReadback())
+            switch (m_ReadbackMode)
             {
-                RenderTexture.active = m_Source;
-                m_CpuTexture.ReadPixels(new Rect(
-                    Vector2.zero,
-                    new Vector2(m_Source.width, m_Source.height)),
-                    0, 0);
-                RenderTexture.active = null;
-                var data = m_CpuTexture.GetRawTextureData<T>();
-                m_ImageReadCallback(Time.frameCount, data, m_Source);
-                return;
+                case ReadbackMode.Synchronous:
+                {
+                    RenderTexture.active = m_Source;
+                    m_CpuTexture.ReadPixels(new Rect(
+                            Vector2.zero,
+                            new Vector2(m_Source.width, m_Source.height)),
+                        0, 0);
+                    RenderTexture.active = null;
+                    var data = m_CpuTexture.GetRawTextureData<T>();
+                    m_ImageReadCallback(Time.frameCount, data, m_Source);
+                    break;
+                }
+                case ReadbackMode.Async:
+                {
+                    var commandBuffer = CommandBufferPool.Get("RenderTextureReader");
+                    var frameCount = Time.frameCount;
+                    commandBuffer.RequestAsyncReadback(m_Source, r => OnGpuReadback(r, frameCount));
+                    context.ExecuteCommandBuffer(commandBuffer);
+                    context.Submit();
+                    CommandBufferPool.Release(commandBuffer);
+                    break;
+                }
             }
-
-            var commandBuffer = CommandBufferPool.Get("RenderTextureReader");
-            var frameCount = Time.frameCount;
-            commandBuffer.RequestAsyncReadback(m_Source, r => OnGpuReadback(r, frameCount));
-            context.ExecuteCommandBuffer(commandBuffer);
-            context.Submit();
-            CommandBufferPool.Release(commandBuffer);
         }
 
         void OnGpuReadback(AsyncGPUReadbackRequest request, int frameCount)

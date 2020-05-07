@@ -86,6 +86,13 @@ namespace UnityEngine.Perception
         public LabelingConfiguration LabelingConfiguration;
 
         /// <summary>
+        /// Controls the timing of GPU ground truth readback. Synchronous will produce ground truth in the same frame as
+        /// rendering but will result in significantly slower rendering. Synchronous is intended to be used primarily
+        /// for debugging.
+        /// </summary>
+        public ReadbackMode ReadbackMode = ReadbackMode.Async;
+
+        /// <summary>
         /// Invoked when RenderedObjectInfos (bounding boxes) are calculated. The first parameter is the Time.frameCount at which the objects were rendered. This may be called many frames after the frame in which the objects were rendered.
         /// </summary>
         public event Action<int, NativeArray<RenderedObjectInfo>> renderedObjectInfosCalculated;
@@ -282,7 +289,7 @@ namespace UnityEngine.Perception
                 m_SegmentationAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("semantic segmentation", specs, "pixel-wise semantic segmentation label", "PNG");
 
                 m_ClassLabelingTextureReader = new RenderTextureReader<short>(m_LabelingTexture, myCamera,
-                    (frameCount, data, tex) => OnSemanticSegmentationImageRead(frameCount, data));
+                    (frameCount, data, tex) => OnSemanticSegmentationImageRead(frameCount, data), ReadbackMode);
             }
 
             if (produceObjectCountAnnotations || produceBoundingBoxAnnotations)
@@ -327,7 +334,7 @@ namespace UnityEngine.Perception
 
                     if (produceVisiblePixelsMetric)
                         ProduceVisiblePixelsMetric(renderedObjectInfos, frameCount);
-                });
+                }, ReadbackMode);
             }
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
