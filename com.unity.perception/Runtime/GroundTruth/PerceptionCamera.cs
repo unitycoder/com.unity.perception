@@ -90,6 +90,9 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public LabelingConfiguration LabelingConfiguration;
 
+        // [SerializeReference]
+        // public List<Labeler> labelers = new List<Labeler>();
+
         /// <summary>
         /// Invoked when RenderedObjectInfos are calculated. The first parameter is the Time.frameCount at which the objects were rendered. This may be called many frames after the frame in which the objects were rendered.
         /// </summary>

@@ -15,7 +15,7 @@ namespace UnityEditor.Perception.GroundTruth
         public void OnEnable()
         {
             m_LabelsList = new ReorderableList(this.serializedObject, this.serializedObject.FindProperty(nameof(LabelingConfiguration.LabelEntries)), true, false, true, true);
-            m_LabelsList.elementHeight = EditorGUIUtility.singleLineHeight * 3 + k_Margin;
+            m_LabelsList.elementHeight = EditorGUIUtility.singleLineHeight * 2 + k_Margin;
             m_LabelsList.drawElementCallback = DrawElement;
             m_LabelsList.onAddCallback += OnAdd;
             m_LabelsList.onRemoveCallback += OnRemove;
@@ -99,14 +99,14 @@ namespace UnityEditor.Perception.GroundTruth
                     labelProperty.stringValue = newLabel;
                 }
             }
-
-            using (var change = new EditorGUI.ChangeCheckScope())
-            {
-                var contentRect = new Rect(rect.position + new Vector2(0, EditorGUIUtility.singleLineHeight * 2), new Vector2(rect.width, EditorGUIUtility.singleLineHeight));
-                var newValue = EditorGUI.IntField(contentRect, nameof(LabelEntry.value), valueProperty.intValue);
-                if (change.changed)
-                    valueProperty.intValue = newValue;
-            }
+            //
+            // using (var change = new EditorGUI.ChangeCheckScope())
+            // {
+            //     var contentRect = new Rect(rect.position + new Vector2(0, EditorGUIUtility.singleLineHeight * 2), new Vector2(rect.width, EditorGUIUtility.singleLineHeight));
+            //     var newValue = EditorGUI.IntField(contentRect, nameof(LabelEntry.value), valueProperty.intValue);
+            //     if (change.changed)
+            //         valueProperty.intValue = newValue;
+            // }
         }
 
         bool autoAssign => serializedObject.FindProperty(nameof(LabelingConfiguration.AutoAssignIds)).boolValue;
