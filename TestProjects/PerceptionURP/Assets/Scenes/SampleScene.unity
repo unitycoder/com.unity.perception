@@ -153,6 +153,7 @@ Transform:
   - {fileID: 1640252283}
   - {fileID: 464025709}
   - {fileID: 411238281}
+  - {fileID: 1058419514}
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -189,7 +190,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b33f0bc2b78db642a758f07826d0dd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  classes:
+  labels:
   - Crate
 --- !u!65 &411238278
 BoxCollider:
@@ -311,7 +312,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b33f0bc2b78db642a758f07826d0dd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  classes:
+  labels:
   - Cube
 --- !u!65 &464025706
 BoxCollider:
@@ -430,7 +431,7 @@ Light:
   m_Type: 1
   m_Shape: 0
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 3.1415927
+  m_Intensity: 0.84
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -549,7 +550,6 @@ MonoBehaviour:
   m_RequiresDepthTextureOption: 2
   m_RequiresOpaqueTextureOption: 2
   m_CameraType: 0
-  m_CameraOutput: 0
   m_Cameras: []
   m_RendererIndex: -1
   m_VolumeLayerMask:
@@ -561,6 +561,7 @@ MonoBehaviour:
   m_AntialiasingQuality: 2
   m_StopNaN: 0
   m_Dithering: 0
+  m_ClearDepth: 1
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
   m_Version: 2
@@ -639,8 +640,64 @@ MonoBehaviour:
   captureRgbImages: 1
   produceSegmentationImages: 1
   produceObjectCountAnnotations: 1
+  objectCountId: 51DA3C27-369D-4929-AEA6-D01614635CE2
+  produceBoundingBoxAnnotations: 1
+  boundingBoxId: F9F22E05-443F-4602-A422-EBE4EA9B55CB
+  produceRenderedObjectInfoMetric: 1
+  renderedObjectInfoId: 5BA92024-B3B7-41A7-9D3F-C03A6A8DDD01
+  boundingBoxOrigin: 0
   LabelingConfiguration: {fileID: 11400000, guid: e74234fe725079e4aa7ecd74797ceb79,
     type: 2}
+--- !u!1 &1058419513
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1058419514}
+  - component: {fileID: 1058419515}
+  m_Layer: 0
+  m_Name: Randomizer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1058419514
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1058419513}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 4662620}
+  m_RootOrder: 5
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1058419515
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1058419513}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e18db86d4c0f4b57b10daa3bac1f2c66, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  randomizationEntries:
+  - GameObject: {fileID: 705507993}
+    ComponentType: UnityEngine.Light
+    MemberName: intensity
+    TargetKind: 1
+    Min: 0
+    Max: 1
 --- !u!1 &1640252278
 GameObject:
   m_ObjectHideFlags: 0
@@ -674,7 +731,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b33f0bc2b78db642a758f07826d0dd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  classes:
+  labels:
   - Box
 --- !u!65 &1640252280
 BoxCollider:
