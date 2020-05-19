@@ -22,9 +22,9 @@ namespace UnityEngine.Perception.GroundTruth {
 
         public string annotationId = "12F94D8D-5425-4DEB-9B21-5E53AD957D66";
         /// <summary>
-        /// The LabelingConfiguration to use for determining segmentation pixel values.
+        /// The SemanticSegmentationLabelConfig to use for determining segmentation pixel values.
         /// </summary>
-        public LabelingConfiguration labelingConfiguration;
+        public SemanticSegmentationLabelConfig labelConfig;
 
         [NonSerialized]
         internal RenderTexture semanticSegmentationTexture;

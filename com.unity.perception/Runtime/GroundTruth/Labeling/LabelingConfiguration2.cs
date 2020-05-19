@@ -4,11 +4,33 @@ using UnityEngine.Serialization;
 
 namespace UnityEngine.Perception.GroundTruth
 {
+    [Serializable]
+    public struct IdLabelEntry : ILabelEntry
+    {
+        string ILabelEntry.label => this.label;
+        public string label;
+        public int id;
+    }
     /// <summary>
     /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.
     /// </summary>
-    [CreateAssetMenu(fileName = "LabelingConfiguration2", menuName = "Perception/Labeling Configuration 2", order = 1)]
-    public class LabelingConfiguration2 : ScriptableObject
+    [CreateAssetMenu(fileName = "IdLabelingConfiguration", menuName = "Perception/ID Labeling Configuration", order = 1)]
+    public class IdLabelConfig : LabelingConfiguration2<IdLabelEntry>
+    {
+    }
+
+    [Serializable]
+    public struct SemanticSegmentationLabelEntry : ILabelEntry
+    {
+        string ILabelEntry.label => this.label;
+        public string label;
+        public int pixelValue;
+    }
+    /// <summary>
+    /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.
+    /// </summary>
+    [CreateAssetMenu(fileName = "SemanticSegmentationLabelingConfiguration", menuName = "Perception/Semantic Segmentation Label Config", order = 1)]
+    public class SemanticSegmentationLabelConfig : LabelingConfiguration2<SemanticSegmentationLabelEntry>
     {
         /// <summary>
         /// Whether the inspector will auto-assign ids based on the id of the first element.
@@ -19,16 +41,19 @@ namespace UnityEngine.Perception.GroundTruth
         /// Whether the inspector will start label ids at zero or one when <see cref="AutoAssignIds"/> is enabled.
         /// </summary>
         public StartingLabelId StartingLabelId = StartingLabelId.One;
-
-        [SerializeField]
-        public List<string> Labels = new List<string>();
-
+    }
+    /// <summary>
+    /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.
+    /// </summary>
+    [CreateAssetMenu(fileName = "LabelingConfiguration2", menuName = "Perception/Labeling Configuration 2", order = 1)]
+    public class LabelingConfiguration2<T> : ScriptableObject where T : ILabelEntry
+    {
         /// <summary>
         /// A sequence of <see cref="LabelEntry"/> which defines the labels relevant for this configuration and their values.
         /// </summary>
         [FormerlySerializedAs("LabelingConfigurations")]
         [SerializeField]
-        public List<LabelFeature> LabelFeatures = new List<LabelFeature>();
+        public List<T> LabelEntries = new List<T>();
 
         /// <summary>
         /// Attempts to find the matching index in <see cref="LabelEntries"/> for the given <see cref="Labeling"/>.
@@ -39,7 +64,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <param name="labeling">The <see cref="Labeling"/> to match </param>
         /// <param name="labelEntry">When this method returns, contains the matching <see cref="LabelEntry"/>, or <code>default</code> if no match was found.</param>
         /// <returns>Returns true if a match was found. False if not.</returns>
-        public bool TryGetMatchingConfigurationEntry(Labeling labeling, out LabelEntry labelEntry)
+        public bool TryGetMatchingConfigurationEntry(Labeling labeling, out T labelEntry)
         {
             return TryGetMatchingConfigurationEntry(labeling, out labelEntry, out int _);
         }
@@ -54,16 +79,16 @@ namespace UnityEngine.Perception.GroundTruth
         /// <param name="labelEntry">When this method returns, contains the matching <see cref="LabelEntry"/>, or <code>default</code> if no match was found.</param>
         /// <param name="labelEntryIndex">When this method returns, contains the index of the matching <see cref="LabelEntry"/>, or <code>-1</code> if no match was found.</param>
         /// <returns>Returns true if a match was found. False if not.</returns>
-        public bool TryGetMatchingConfigurationEntry(Labeling labeling, out LabelEntry labelEntry, out int labelEntryIndex)
+        public bool TryGetMatchingConfigurationEntry(Labeling labeling, out T labelEntry, out int labelEntryIndex)
         {
             foreach (var labelingClass in labeling.labels)
             {
                 for (var i = 0; i < LabelEntries.Count; i++)
                 {
                     var entry = LabelEntries[i];
-                    if (string.Equals(entry.label, labelingClass))
+                    if (string.Equals(entry, labelingClass))
                     {
-                        labelEntry = entry;
+                        labelEntry = LabelEntries[i];
                         labelEntryIndex = i;
                         return true;
                     }
@@ -76,27 +101,8 @@ namespace UnityEngine.Perception.GroundTruth
         }
     }
 
-    /// <summary>
-    /// Structure defining a label configuration for <see cref="LabelingConfiguration"/>.
-    /// </summary>
-    [Serializable]
-    public class LabelFeature
+    public interface ILabelEntry
     {
-        public string key;
-    }
-    [Serializable]
-    public class StringLabelFeature : LabelFeature
-    {
-        public List<string> values;
-    }
-    [Serializable]
-    public class IntLabelFeature : LabelFeature
-    {
-        public List<string> values;
-    }
-    [Serializable]
-    public class ColorLabelFeature : LabelFeature
-    {
-        public List<string> values;
+        string label { get; }
     }
 }
