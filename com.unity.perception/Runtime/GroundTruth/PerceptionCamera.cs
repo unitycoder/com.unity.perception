@@ -52,7 +52,10 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// Event invoked after the camera finishes rendering during a frame.
         /// </summary>
-        public event Action BeginRendering;
+
+
+        [SerializeReference]
+        public List<CameraLabeler> labelers = new List<CameraLabeler>();
         Dictionary<string, object> m_PersistentSensorData = new Dictionary<string, object>();
 
 #if URP_PRESENT
@@ -235,6 +238,12 @@ namespace UnityEngine.Perception.GroundTruth
 
             SensorHandle = default;
         }
+
+    }
+
+    [Serializable]
+    public abstract class CameraLabeler
+    {
 
     }
 }

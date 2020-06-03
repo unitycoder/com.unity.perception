@@ -12,21 +12,26 @@ namespace UnityEditor.Perception.GroundTruth
 
         public void OnEnable()
         {
-            // m_LabelersList = new ReorderableList(this.serializedObject, this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers)), true, false, true, true);
-            // m_LabelersList.elementHeightCallback = GetElementHeight;
-            // m_LabelersList.drawElementCallback = DrawElement;
-            // m_LabelersList.onAddCallback += OnAdd;
-            // m_LabelersList.onRemoveCallback += OnRemove;
+            m_LabelersList = new ReorderableList(this.serializedObject, this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers)), true, false, true, true);
+            m_LabelersList.elementHeightCallback = GetElementHeight;
+            m_LabelersList.drawElementCallback = DrawElement;
+            m_LabelersList.onAddCallback += OnAdd;
+            m_LabelersList.onRemoveCallback += OnRemove;
         }
 
         float GetElementHeight(int index)
         {
-            throw new System.NotImplementedException();
+            var serializedProperty = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers));
+            var element = serializedProperty.GetArrayElementAtIndex(index);
+            var editor = Editor.CreateEditor(element.managedReferenceValue);
+            return 10;
         }
 
         void DrawElement(Rect rect, int index, bool isactive, bool isfocused)
         {
-            throw new NotImplementedException();
+            var element = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers)).GetArrayElementAtIndex(index);
+            var editor = Editor.CreateEditor(element.managedReferenceValue);
+            editor.OnInspectorGUI();
         }
 
         void OnRemove(ReorderableList list)
@@ -36,7 +41,11 @@ namespace UnityEditor.Perception.GroundTruth
 
         void OnAdd(ReorderableList list)
         {
-            throw new System.NotImplementedException();
+            var labelers = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers));
+            labelers.InsertArrayElementAtIndex(0);
+            var element = labelers.GetArrayElementAtIndex(0);
+            element.managedReferenceValue = new BoundingBoxLabeler();
+            serializedObject.ApplyModifiedProperties();
         }
 
         public override void OnInspectorGUI()
@@ -45,7 +54,8 @@ namespace UnityEditor.Perception.GroundTruth
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.period)));
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.startTime)));
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.captureRgbImages)));
-            //m_LabelersList.DoLayoutList();
+            //EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.labelers)));
+            m_LabelersList.DoLayoutList();
         }
     }
 }

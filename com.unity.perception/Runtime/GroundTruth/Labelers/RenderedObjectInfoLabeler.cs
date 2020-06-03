@@ -10,9 +10,8 @@ using UnityEngine.Serialization;
 
 namespace UnityEngine.Perception.GroundTruth
 {
-    [AddComponentMenu("Perception/Labelers/RenderedObjectInfoLabeler")]
-    [RequireComponent(typeof(InstanceSegmentationLabeler))]
-    public class RenderedObjectInfoLabeler : MonoBehaviour
+    [Serializable]
+    public class RenderedObjectInfoLabeler : CameraLabeler
     {
         public bool produceObjectInfoMetrics = true;
         /// <summary>

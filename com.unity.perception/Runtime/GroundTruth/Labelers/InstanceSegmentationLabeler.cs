@@ -6,10 +6,7 @@ using UnityEngine.Rendering.HighDefinition;
 #endif
 
 namespace UnityEngine.Perception.GroundTruth {
-    [AddComponentMenu("Perception/Labelers/InstanceSegmentationLabeler")]
-    [RequireComponent(typeof(Camera))]
-    [RequireComponent(typeof(PerceptionCamera))]
-    public class InstanceSegmentationLabeler : MonoBehaviour
+    public class InstanceSegmentationLabeler : CameraLabeler
     {
         //Uncomment when we support saving instance segmentation labels
         //public bool saveImages = false;

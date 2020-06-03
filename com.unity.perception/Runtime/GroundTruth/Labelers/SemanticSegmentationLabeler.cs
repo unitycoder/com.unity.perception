@@ -13,9 +13,8 @@ using UnityEngine.Rendering.HighDefinition;
 #endif
 
 namespace UnityEngine.Perception.GroundTruth {
-    [AddComponentMenu("Perception/Labelers/SemanticSegmentationLabeler")]
-    [RequireComponent(typeof(InstanceSegmentationLabeler))]
-    public class SemanticSegmentationLabeler : MonoBehaviour
+    [Serializable]
+    public class SemanticSegmentationLabeler : CameraLabeler
     {
         const string k_SemanticSegmentationDirectory = "SemanticSegmentation";
         const string k_SegmentationFilePrefix = "segmentation_";
