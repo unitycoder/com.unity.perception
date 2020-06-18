@@ -90,9 +90,6 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public LabelingConfiguration LabelingConfiguration;
 
-        // [SerializeReference]
-        // public List<Labeler> labelers = new List<Labeler>();
-
         /// <summary>
         /// Invoked when RenderedObjectInfos are calculated. The first parameter is the Time.frameCount at which the objects were rendered. This may be called many frames after the frame in which the objects were rendered.
         /// </summary>
@@ -155,21 +152,7 @@ namespace UnityEngine.Perception.GroundTruth
             public uint count;
         }
 
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
-        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
-        struct BoundingBoxValue
-        {
-            public int label_id;
-            public string label_name;
-            public int instance_id;
-            public float x;
-            public float y;
-            public float width;
-            public float height;
-        }
-
         ClassCountValue[] m_ClassCountValues;
-        BoundingBoxValue[] m_BoundingBoxValues;
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
 
 #if HDRP_PRESENT
@@ -186,7 +169,6 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_EncodeAndSave = new ProfilerMarker("Encode and save (PerceptionCamera)");
         static ProfilerMarker s_ClassCountCallback = new ProfilerMarker("OnClassLabelsReceived");
         static ProfilerMarker s_RenderedObjectInfosCalculatedEvent = new ProfilerMarker("renderedObjectInfosCalculated event");
-        static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxesReceived");
         static ProfilerMarker s_ProduceRenderedObjectInfoMetric = new ProfilerMarker("ProduceRenderedObjectInfoMetric");
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]
@@ -306,11 +288,6 @@ namespace UnityEngine.Perception.GroundTruth
                     m_ObjectCountMetricDefinition = SimulationManager.RegisterMetricDefinition("object count", labelingMetricSpec, "Counts of objects for each label in the sensor's view", id: new Guid(objectCountId));
                 }
 
-                if (produceBoundingBoxAnnotations)
-                {
-                    m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", labelingMetricSpec, "Bounding box for each labeled object visible to the sensor", id: new Guid(boundingBoxId));
-                }
-
                 if (produceRenderedObjectInfoMetric)
                     m_RenderedObjectInfoMetricDefinition = SimulationManager.RegisterMetricDefinition("rendered object info", labelingMetricSpec, "Information about each labeled object visible to the sensor", id: new Guid(renderedObjectInfoId));
 
@@ -329,9 +306,6 @@ namespace UnityEngine.Perception.GroundTruth
 
                     if (produceObjectCountAnnotations)
                         OnObjectCountsReceived(classCounts, LabelingConfiguration.LabelEntries, frameCount);
-
-                    if (produceBoundingBoxAnnotations)
-                        ProduceBoundingBoxesAnnotation(renderedObjectInfos, LabelingConfiguration.LabelEntries, frameCount);
 
                     if (produceRenderedObjectInfoMetric)
                         ProduceRenderedObjectInfoMetric(renderedObjectInfos, frameCount);
@@ -404,39 +378,6 @@ namespace UnityEngine.Perception.GroundTruth
 
         void ProduceBoundingBoxesAnnotation(NativeArray<RenderedObjectInfo> renderedObjectInfos, List<LabelEntry> labelingConfigurations, int frameCount)
         {
-            using (s_BoundingBoxCallback.Auto())
-            {
-                var findResult = FindAsyncCaptureInfo(frameCount);
-                if (findResult.index == -1)
-                    return;
-                var asyncCaptureInfo = findResult.asyncCaptureInfo;
-                var boundingBoxAsyncAnnotation = asyncCaptureInfo.BoundingBoxAsyncMetric;
-                if (!boundingBoxAsyncAnnotation.IsValid)
-                    return;
-
-                if (m_BoundingBoxValues == null || m_BoundingBoxValues.Length != renderedObjectInfos.Length)
-                    m_BoundingBoxValues = new BoundingBoxValue[renderedObjectInfos.Length];
-
-                for (var i = 0; i < renderedObjectInfos.Length; i++)
-                {
-                    var objectInfo = renderedObjectInfos[i];
-                    if (!TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
-                        continue;
-
-                    m_BoundingBoxValues[i] = new BoundingBoxValue
-                    {
-                        label_id = labelEntry.id,
-                        label_name = labelEntry.label,
-                        instance_id = objectInfo.instanceId,
-                        x = objectInfo.boundingBox.x,
-                        y = objectInfo.boundingBox.y,
-                        width = objectInfo.boundingBox.width,
-                        height = objectInfo.boundingBox.height,
-                    };
-                }
-
-                boundingBoxAsyncAnnotation.ReportValues(m_BoundingBoxValues);
-            }
         }
 
         /// <summary>
@@ -528,9 +469,6 @@ namespace UnityEngine.Perception.GroundTruth
 
                 if (produceObjectCountAnnotations)
                     captureInfo.ClassCountAsyncMetric = SensorHandle.ReportMetricAsync(m_ObjectCountMetricDefinition);
-
-                if (produceBoundingBoxAnnotations)
-                    captureInfo.BoundingBoxAsyncMetric = SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
 
                 if (produceRenderedObjectInfoMetric)
                     captureInfo.RenderedObjectInfoAsyncMetric = SensorHandle.ReportMetricAsync(m_RenderedObjectInfoMetricDefinition);
