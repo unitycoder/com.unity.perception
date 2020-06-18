@@ -709,6 +709,7 @@ namespace UnityEngine.Perception.GroundTruth
     [Serializable]
     public abstract class CameraLabeler
     {
-
+        public bool enabled;
+        public bool foldout;
     }
 }
