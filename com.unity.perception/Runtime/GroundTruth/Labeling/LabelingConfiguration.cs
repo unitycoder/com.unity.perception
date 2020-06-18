@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using JetBrains.Annotations;
 using UnityEngine.Serialization;
 
 namespace UnityEngine.Perception.GroundTruth
@@ -70,6 +73,30 @@ namespace UnityEngine.Perception.GroundTruth
             labelEntryIndex = -1;
             labelEntry = default;
             return false;
+        }
+
+        [SuppressMessage("ReSharper", "InconsistentNaming")]
+        internal struct LabelEntrySpec
+        {
+            /// <summary>
+            /// The label id prepared for reporting in the annotation
+            /// </summary>
+            [UsedImplicitly]
+            public int label_id;
+            /// <summary>
+            /// The label name prepared for reporting in the annotation
+            /// </summary>
+            [UsedImplicitly]
+            public string label_name;
+        }
+
+        internal LabelEntrySpec[] GetAnnotationSpecification()
+        {
+            return LabelEntries.Select((l) => new LabelEntrySpec()
+            {
+                label_id = l.id,
+                label_name = l.label,
+            }).ToArray();
         }
     }
 

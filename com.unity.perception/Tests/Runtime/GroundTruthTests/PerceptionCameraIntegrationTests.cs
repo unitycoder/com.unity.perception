@@ -54,7 +54,7 @@ namespace GroundTruthTests
         public IEnumerator EnableSemanticSegmentation_GeneratesCorrectDataset()
         {
             var labelingConfiguration = CreateLabelingConfiguration();
-            SetupCamera(labelingConfiguration, pc => pc.produceSegmentationImages = true);
+            SetupCamera(labelingConfiguration, pc => pc.produceSemanticSegmentationImages = true);
 
             string expectedImageFilename = $"segmentation_{Time.frameCount}.png";
 
@@ -94,7 +94,7 @@ namespace GroundTruthTests
             camera.orthographicSize = 1;
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
-            perceptionCamera.produceSegmentationImages = false;
+            perceptionCamera.produceSemanticSegmentationImages = false;
             perceptionCamera.produceRenderedObjectInfoMetric = false;
             perceptionCamera.produceBoundingBoxAnnotations = false;
             perceptionCamera.produceObjectCountAnnotations = false;

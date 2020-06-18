@@ -81,7 +81,7 @@ namespace GroundTruthTests
                 var skinnedMeshRenderer = planeObject.AddComponent<SkinnedMeshRenderer>();
                 skinnedMeshRenderer.sharedMesh = meshFilter.sharedMesh;
                 skinnedMeshRenderer.material = meshRenderer.material;
-                
+
                 Object.DestroyImmediate(oldObject);
             }
             planeObject.transform.SetPositionAndRotation(new Vector3(0, 0, 10), Quaternion.Euler(90, 0, 0));
@@ -198,7 +198,7 @@ namespace GroundTruthTests
             perceptionCamera.captureRgbImages = false;
             perceptionCamera.produceBoundingBoxAnnotations = false;
             perceptionCamera.produceObjectCountAnnotations = true;
-            perceptionCamera.segmentationImageReceived += onSegmentationImageReceived;
+            perceptionCamera.instanceSegmentationImageReceived += onSegmentationImageReceived;
 #endif
             AddTestObjectForCleanup(cameraObject);
             cameraObject.SetActive(true);
