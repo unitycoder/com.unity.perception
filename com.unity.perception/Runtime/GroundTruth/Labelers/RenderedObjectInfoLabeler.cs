@@ -30,8 +30,6 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_ClassCountCallback = new ProfilerMarker("OnClassLabelsReceived");
         static ProfilerMarker s_ProduceRenderedObjectInfoMetric = new ProfilerMarker("ProduceRenderedObjectInfoMetric");
 
-        RenderedObjectInfoGenerator m_RenderedObjectInfoGenerator;
-
         [SuppressMessage("ReSharper", "InconsistentNaming")]
         struct ObjectCountSpec
         {
@@ -69,16 +67,29 @@ namespace UnityEngine.Perception.GroundTruth
         Dictionary<int, AsyncMetric> m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetric>();
         MetricDefinition m_ObjectCountMetricDefinition;
         MetricDefinition m_RenderedObjectInfoMetricDefinition;
-        PerceptionCamera m_PerceptionCamera;
-
-        /// <summary>
-        /// Invoked when RenderedObjectInfos are calculated. The first parameter is the Time.frameCount at which the objects were rendered. This may be called many frames after the frame in which the objects were rendered.
-        /// </summary>
-        public event Action<int, NativeArray<RenderedObjectInfo>> renderedObjectInfosCalculated;
 
         internal event Action<NativeSlice<uint>, IReadOnlyList<LabelEntry>, int> classCountsReceived;
 
-        public void Start()
+        public string boundingBoxAnnotationId = "F9F22E05-443F-4602-A422-EBE4EA9B55CB";
+
+        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+        AnnotationDefinition m_BoundingBoxAnnotationDefinition;
+        BoundingBoxValue[] m_BoundingBoxValues;
+
+        [SuppressMessage("ReSharper", "InconsistentNaming")]
+        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
+        struct BoundingBoxValue
+        {
+            public int label_id;
+            public string label_name;
+            public int instance_id;
+            public float x;
+            public float y;
+            public float width;
+            public float height;
+        }
+
+        public void Setup()
         {
             if (labelingConfiguration == null)
             {
@@ -87,14 +98,9 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
             }
 
-            m_PerceptionCamera = GetComponent<PerceptionCamera>();
-            var instanceSegmentationLabeler = GetComponent<InstanceSegmentationLabeler>();
-            m_RenderedObjectInfoGenerator = new RenderedObjectInfoGenerator(labelingConfiguration);
-            World.DefaultGameObjectInjectionWorld.GetExistingSystem<GroundTruthLabelSetupSystem>().Activate(m_RenderedObjectInfoGenerator);
 
-            instanceSegmentationLabeler.InstanceSegmentationImageReadback += (frameCount, data, tex) =>
+            PerceptionCamera.InstanceSegmentationImageReadback += (frameCount, data, tex) =>
             {
-                m_RenderedObjectInfoGenerator.Compute(data, tex.width, BoundingBoxOrigin.TopLeft, out var renderedObjectInfos, out var classCounts, Allocator.Temp);
 
                 using (s_RenderedObjectInfosCalculatedEvent.Auto())
                     renderedObjectInfosCalculated?.Invoke(frameCount, renderedObjectInfos);
@@ -105,10 +111,9 @@ namespace UnityEngine.Perception.GroundTruth
                 if (produceObjectInfoMetrics)
                     ProduceRenderedObjectInfoMetric(renderedObjectInfos, frameCount);
             };
-            m_PerceptionCamera.BeginRendering += ReportAsyncMetrics;
         }
 
-        void ReportAsyncMetrics()
+        public override void OnBeginRendering()
         {
             if (produceObjectCountMetrics)
             {

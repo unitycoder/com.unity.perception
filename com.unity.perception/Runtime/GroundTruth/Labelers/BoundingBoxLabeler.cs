@@ -1,19 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using Unity.Collections;
 using Unity.Profiling;
 
 namespace UnityEngine.Perception.GroundTruth
 {
     [Serializable]
-    public class BoundingBoxLabeler : CameraLabeler
+    public class BoundingBox2DLabeler : CameraLabeler
     {
         public string annotationId = "F9F22E05-443F-4602-A422-EBE4EA9B55CB";
 
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxesReceived");
+        public LabelingConfiguration labelingConfiguration;
 
-        PerceptionCamera m_PerceptionCamera;
         Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
         AnnotationDefinition m_BoundingBoxAnnotationDefinition;
         BoundingBoxValue[] m_BoundingBoxValues;
@@ -32,20 +33,22 @@ namespace UnityEngine.Perception.GroundTruth
             public float height;
         }
 
-        void Start()
+        public override void Setup()
         {
-            m_PerceptionCamera = GetComponent<PerceptionCamera>();
-            m_RenderedObjectInfoLabeler = GetComponent<RenderedObjectInfoLabeler>();
+            m_RenderedObjectInfoLabeler = (RenderedObjectInfoLabeler)PerceptionCamera.labelers.First(l => l is RenderedObjectInfoLabeler && ((RenderedObjectInfoLabeler)l).labelingConfiguration == labelingConfiguration);
+            if (m_RenderedObjectInfoLabeler == null)
+            {
+                PerceptionCamera.labelers
+            }
             m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", m_RenderedObjectInfoLabeler.labelingConfiguration.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
-            m_RenderedObjectInfoLabeler.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
 
-            m_PerceptionCamera.BeginRendering += ReportAsyncMetrics;
+            m_RenderedObjectInfoLabeler.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
         }
 
-        void ReportAsyncMetrics()
+        public override void OnBeginRendering()
         {
-            m_AsyncAnnotations[Time.frameCount] = m_PerceptionCamera.SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
+            m_AsyncAnnotations[Time.frameCount] = PerceptionCamera.SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
         }
 
         void OnRenderedObjectInfosCalculated(int frameCount, NativeArray<RenderedObjectInfo> renderedObjectInfos)

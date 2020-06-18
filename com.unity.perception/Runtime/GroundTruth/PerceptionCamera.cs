@@ -27,7 +27,7 @@ namespace UnityEngine.Perception.GroundTruth
     /// Captures ground truth from the associated Camera.
     /// </summary>
     [RequireComponent(typeof(Camera))]
-    public class PerceptionCamera : MonoBehaviour
+    public partial class PerceptionCamera : MonoBehaviour
     {
         //TODO: Remove the Guid path when we have proper dataset merging in USim/Thea
         internal static string RgbDirectory { get; } = $"RGB{Guid.NewGuid()}";
@@ -116,9 +116,7 @@ namespace UnityEngine.Perception.GroundTruth
             var ego = m_EgoMarker == null ? SimulationManager.RegisterEgo("") : m_EgoMarker.EgoHandle;
             SensorHandle = SimulationManager.RegisterSensor(ego, "camera", description, period, startTime);
 
-            var myCamera = GetComponent<Camera>();
-            var width = myCamera.pixelWidth;
-            var height = myCamera.pixelHeight;
+            SetupInstanceSegmentation();
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
@@ -223,7 +221,6 @@ namespace UnityEngine.Perception.GroundTruth
             if (UnityEditor.EditorApplication.isPaused)
                 return;
 #endif
-            BeginRendering?.Invoke();
             CaptureRgbData(cam);
         }
 
@@ -237,8 +234,8 @@ namespace UnityEngine.Perception.GroundTruth
                 SensorHandle.Dispose();
 
             SensorHandle = default;
+            CleanUpInstanceSegmentation();
         }
-
     }
 
     [Serializable]
@@ -246,5 +243,18 @@ namespace UnityEngine.Perception.GroundTruth
     {
         public bool enabled;
         public bool foldout;
+
+        protected PerceptionCamera PerceptionCamera { get; private set; }
+        protected SensorHandle SensorHandle { get; private set; }
+
+        public abstract void Setup();
+        public virtual void OnUpdate() {}
+        public virtual void OnBeginRendering() {}
+
+        internal void Init(PerceptionCamera perceptionCamera)
+        {
+            PerceptionCamera = perceptionCamera;
+            SensorHandle = perceptionCamera.SensorHandle;
+        }
     }
 }

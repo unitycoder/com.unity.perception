@@ -104,7 +104,6 @@ namespace UnityEngine.Perception.GroundTruth
                 {
                     m_InstanceIdToLabelEntryIndexLookup.Resize((int)instanceId + 1, NativeArrayOptions.ClearMemory);
                 }
-
                 m_InstanceIdToLabelEntryIndexLookup[(int)instanceId] = index;
             }
         }

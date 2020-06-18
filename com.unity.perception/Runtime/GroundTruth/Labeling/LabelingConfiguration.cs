@@ -13,6 +13,11 @@ namespace UnityEngine.Perception.GroundTruth
     [CreateAssetMenu(fileName = "LabelingConfiguration", menuName = "Perception/Labeling Configuration", order = 1)]
     public class LabelingConfiguration : ScriptableObject
     {
+        [FormerlySerializedAs("LabelingConfigurations")]
+        [FormerlySerializedAs("LabelEntries")]
+        [SerializeField]
+        List<LabelEntry> m_LabelEntries = new List<LabelEntry>();
+
         /// <summary>
         /// Whether the inspector will auto-assign ids based on the id of the first element.
         /// </summary>
@@ -26,9 +31,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// <summary>
         /// A sequence of <see cref="LabelEntry"/> which defines the labels relevant for this configuration and their values.
         /// </summary>
-        [FormerlySerializedAs("LabelingConfigurations")]
-        [SerializeField]
-        public List<LabelEntry> LabelEntries = new List<LabelEntry>();
+        public IReadOnlyList<LabelEntry> LabelEntries => m_LabelEntries;
 
         /// <summary>
         /// Attempts to find the matching index in <see cref="LabelEntries"/> for the given <see cref="Labeling"/>.
