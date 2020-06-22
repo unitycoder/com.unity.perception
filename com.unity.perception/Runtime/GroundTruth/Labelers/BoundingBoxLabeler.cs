@@ -8,7 +8,7 @@ namespace UnityEngine.Perception.GroundTruth
 {
     [AddComponentMenu("Perception/Labelers/BoundingBoxLabeler")]
     [RequireComponent(typeof(PerceptionCamera))]
-    [RequireComponent(typeof(InstanceSegmentationLabeler))]
+    [RequireComponent(typeof(RenderedObjectInfoLabeler))]
     public class BoundingBoxLabeler : MonoBehaviour
     {
         public string annotationId = "F9F22E05-443F-4602-A422-EBE4EA9B55CB";
@@ -20,6 +20,7 @@ namespace UnityEngine.Perception.GroundTruth
         Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
         AnnotationDefinition m_BoundingBoxAnnotationDefinition;
         BoundingBoxValue[] m_BoundingBoxValues;
+        RenderedObjectInfoLabeler m_RenderedObjectInfoLabeler;
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]
         [SuppressMessage("ReSharper", "NotAccessedField.Local")]
@@ -36,17 +37,24 @@ namespace UnityEngine.Perception.GroundTruth
 
         void Start()
         {
+            if (labelingConfiguration == null)
+            {
+                Debug.LogError("labelingConfiguration must be assigned.");
+                this.enabled = false;
+                return;
+            }
+
             m_PerceptionCamera = GetComponent<PerceptionCamera>();
+            m_RenderedObjectInfoLabeler = GetComponent<RenderedObjectInfoLabeler>();
             m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", labelingConfiguration.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
-            m_PerceptionCamera.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
+            m_RenderedObjectInfoLabeler.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
+
+            m_PerceptionCamera.BeginRendering += ReportAsyncMetrics;
         }
 
-        void Update()
+        void ReportAsyncMetrics()
         {
-            if (!m_PerceptionCamera.SensorHandle.ShouldCaptureThisFrame)
-                return;
-
             m_AsyncAnnotations[Time.frameCount] = m_PerceptionCamera.SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
         }
 
@@ -65,7 +73,7 @@ namespace UnityEngine.Perception.GroundTruth
                 for (var i = 0; i < renderedObjectInfos.Length; i++)
                 {
                     var objectInfo = renderedObjectInfos[i];
-                    if (!m_PerceptionCamera.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
+                    if (!m_RenderedObjectInfoLabeler.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
                         continue;
 
                     m_BoundingBoxValues[i] = new BoundingBoxValue

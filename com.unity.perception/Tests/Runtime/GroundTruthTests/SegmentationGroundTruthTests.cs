@@ -175,11 +175,12 @@ namespace GroundTruthTests
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = false;
-            perceptionCamera.produceBoundingBoxAnnotations = false;
-            perceptionCamera.produceObjectCountAnnotations = true;
 
             var instanceSegmentationLabeler = cameraObject.AddComponent<InstanceSegmentationLabeler>();
             instanceSegmentationLabeler.InstanceSegmentationImageReadback += onSegmentationImageReceived;
+            var renderedObjectInfoLabeler = cameraObject.AddComponent<RenderedObjectInfoLabeler>();
+            renderedObjectInfoLabeler.labelingConfiguration = labelingConfiguration;
+            renderedObjectInfoLabeler.produceObjectInfoMetrics = false;
 
             AddTestObjectForCleanup(cameraObject);
             cameraObject.SetActive(true);

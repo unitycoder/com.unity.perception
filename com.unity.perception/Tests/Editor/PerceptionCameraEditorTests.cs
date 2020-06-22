@@ -65,8 +65,8 @@ namespace EditorTests
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = true;
-            perceptionCamera.produceBoundingBoxAnnotations = true;
-            perceptionCamera.produceObjectCountAnnotations = true;
+            cameraObject.AddComponent<BoundingBoxLabeler>();
+            cameraObject.AddComponent<RenderedObjectInfoLabeler>();
 
             cameraObject.SetActive(true);
         }

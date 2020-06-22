@@ -35,7 +35,7 @@ namespace GroundTruthTests
             var labelingConfiguration = CreateLabelingConfiguration();
             SetupCamera(labelingConfiguration, pc =>
             {
-                pc.produceBoundingBoxAnnotations = true;
+                pc.gameObject.AddComponent<BoundingBoxLabeler>();
             });
 
             var plane = TestHelper.CreateLabeledPlane();
@@ -95,9 +95,6 @@ namespace GroundTruthTests
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.produceSegmentationImages = false;
-            perceptionCamera.produceRenderedObjectInfoMetric = false;
-            perceptionCamera.produceBoundingBoxAnnotations = false;
-            perceptionCamera.produceObjectCountAnnotations = false;
             perceptionCamera.captureRgbImages = false;
             perceptionCamera.LabelingConfiguration = labelingConfiguration;
             initPerceptionCamera(perceptionCamera);
