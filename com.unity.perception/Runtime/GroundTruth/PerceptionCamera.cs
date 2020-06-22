@@ -13,6 +13,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.Serialization;
 #if HDRP_PRESENT
 using UnityEngine.Rendering.HighDefinition;
@@ -101,19 +102,17 @@ namespace UnityEngine.Perception.GroundTruth
 
         [NonSerialized]
         internal RenderTexture labelingTexture;
-        [NonSerialized]
-        internal RenderTexture segmentationTexture;
 
         RenderTextureReader<short> m_ClassLabelingTextureReader;
-        RenderTextureReader<uint> m_SegmentationReader;
         RenderedObjectInfoGenerator m_RenderedObjectInfoGenerator;
         Dictionary<string, object> m_PersistentSensorData = new Dictionary<string, object>();
 
 #if URP_PRESENT
-        [NonSerialized]
-        internal InstanceSegmentationUrpPass instanceSegmentationUrpPass;
-        [NonSerialized]
-        internal SemanticSegmentationUrpPass semanticSegmentationUrpPass;
+        internal List<ScriptableRenderPass> passes = new List<ScriptableRenderPass>();
+        public void AddScriptableRenderPass(ScriptableRenderPass pass)
+        {
+            passes.Add(pass);
+        }
 #endif
 
         bool m_CapturedLastFrame;
@@ -156,7 +155,6 @@ namespace UnityEngine.Perception.GroundTruth
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
 
 #if HDRP_PRESENT
-        InstanceSegmentationPass m_SegmentationPass;
         SemanticSegmentationPass m_SemanticSegmentationPass;
 #endif
         MetricDefinition m_ObjectCountMetricDefinition;
@@ -232,8 +230,6 @@ namespace UnityEngine.Perception.GroundTruth
                 produceBoundingBoxAnnotations = false;
             }
 
-            segmentationTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
-            segmentationTexture.name = "Segmentation";
             labelingTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
             labelingTexture.name = "Labeling";
 
@@ -241,13 +237,6 @@ namespace UnityEngine.Perception.GroundTruth
             var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
             customPassVolume.injectionPoint = CustomPassInjectionPoint.BeforeRendering;
             customPassVolume.isGlobal = true;
-            m_SegmentationPass = new InstanceSegmentationPass()
-            {
-                name = "Segmentation Pass",
-                targetCamera = myCamera,
-                targetTexture = segmentationTexture
-            };
-            m_SegmentationPass.EnsureInit();
             m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, labelingTexture, LabelingConfiguration)
             {
                 name = "Labeling Pass"
@@ -256,8 +245,7 @@ namespace UnityEngine.Perception.GroundTruth
             SetupPasses(customPassVolume);
 #endif
 #if URP_PRESENT
-            instanceSegmentationUrpPass = new InstanceSegmentationUrpPass(myCamera, segmentationTexture);
-            semanticSegmentationUrpPass = new SemanticSegmentationUrpPass(myCamera, labelingTexture, LabelingConfiguration);
+            AddScriptableRenderPass(new SemanticSegmentationUrpPass(myCamera, labelingTexture, LabelingConfiguration));
 #endif
 
             if (produceSegmentationImages)
@@ -294,22 +282,29 @@ namespace UnityEngine.Perception.GroundTruth
                 m_RenderedObjectInfoGenerator = new RenderedObjectInfoGenerator(LabelingConfiguration);
                 World.DefaultGameObjectInjectionWorld.GetExistingSystem<GroundTruthLabelSetupSystem>().Activate(m_RenderedObjectInfoGenerator);
 
-                m_SegmentationReader = new RenderTextureReader<uint>(segmentationTexture, myCamera, (frameCount, data, tex) =>
+                var instanceSegmentationLabeler = GetComponent<InstanceSegmentationLabeler>();
+                if (instanceSegmentationLabeler != null)
                 {
-                    if (segmentationImageReceived != null)
-                        segmentationImageReceived(frameCount, data);
+                    instanceSegmentationLabeler.InstanceSegmentationImageReadback += (frameCount, data, tex) =>
+                    {
+                        segmentationImageReceived?.Invoke(frameCount, data);
 
-                    m_RenderedObjectInfoGenerator.Compute(data, tex.width, boundingBoxOrigin, out var renderedObjectInfos, out var classCounts, Allocator.Temp);
+                        m_RenderedObjectInfoGenerator.Compute(data, tex.width, boundingBoxOrigin, out var renderedObjectInfos, out var classCounts, Allocator.Temp);
 
-                    using (s_RenderedObjectInfosCalculatedEvent.Auto())
-                        renderedObjectInfosCalculated?.Invoke(frameCount, renderedObjectInfos);
+                        using (s_RenderedObjectInfosCalculatedEvent.Auto())
+                            renderedObjectInfosCalculated?.Invoke(frameCount, renderedObjectInfos);
 
-                    if (produceObjectCountAnnotations)
-                        OnObjectCountsReceived(classCounts, LabelingConfiguration.LabelEntries, frameCount);
+                        if (produceObjectCountAnnotations)
+                            OnObjectCountsReceived(classCounts, LabelingConfiguration.LabelEntries, frameCount);
 
-                    if (produceRenderedObjectInfoMetric)
-                        ProduceRenderedObjectInfoMetric(renderedObjectInfos, frameCount);
-                });
+                        if (produceRenderedObjectInfoMetric)
+                            ProduceRenderedObjectInfoMetric(renderedObjectInfos, frameCount);
+                    };
+                }
+                else
+                {
+                    Debug.Log("Missing InstanceSegmentationLabeler. Will not generate metrics.");
+                }
             }
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
@@ -364,21 +359,13 @@ namespace UnityEngine.Perception.GroundTruth
 #if HDRP_PRESENT
         void SetupPasses(CustomPassVolume customPassVolume)
         {
-            customPassVolume.customPasses.Remove(m_SegmentationPass);
             customPassVolume.customPasses.Remove(m_SemanticSegmentationPass);
-
-            if (produceSegmentationImages || produceObjectCountAnnotations)
-                customPassVolume.customPasses.Add(m_SegmentationPass);
 
             if (produceSegmentationImages)
                 customPassVolume.customPasses.Add(m_SemanticSegmentationPass);
         }
 
 #endif
-
-        void ProduceBoundingBoxesAnnotation(NativeArray<RenderedObjectInfo> renderedObjectInfos, List<LabelEntry> labelingConfigurations, int frameCount)
-        {
-        }
 
         /// <summary>
         /// Returns the class ID for the given instance ID resolved by <see cref="LabelingConfiguration"/>. Only valid when bounding boxes are being computed.
@@ -559,10 +546,6 @@ namespace UnityEngine.Perception.GroundTruth
             m_ClassLabelingTextureReader?.Dispose();
             m_ClassLabelingTextureReader = null;
 
-            m_SegmentationReader?.WaitForAllImages();
-            m_SegmentationReader?.Dispose();
-            m_SegmentationReader = null;
-
             RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
         }
 
@@ -586,10 +569,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             m_ClassLabelingTextureReader?.Dispose();
             m_ClassLabelingTextureReader = null;
-            if (segmentationTexture != null)
-                segmentationTexture.Release();
 
-            segmentationTexture = null;
             if (labelingTexture != null)
                 labelingTexture.Release();
 

@@ -4,9 +4,11 @@ using System.Diagnostics.CodeAnalysis;
 using Unity.Collections;
 using Unity.Profiling;
 
-namespace UnityEngine.Perception.GroundTruth {
+namespace UnityEngine.Perception.GroundTruth
+{
     [AddComponentMenu("Perception/Labelers/BoundingBoxLabeler")]
     [RequireComponent(typeof(PerceptionCamera))]
+    [RequireComponent(typeof(InstanceSegmentationLabeler))]
     public class BoundingBoxLabeler : MonoBehaviour
     {
         public string annotationId = "F9F22E05-443F-4602-A422-EBE4EA9B55CB";

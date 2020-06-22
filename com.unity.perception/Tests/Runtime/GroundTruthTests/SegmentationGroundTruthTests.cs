@@ -52,7 +52,7 @@ namespace GroundTruthTests
         {
             int timesSegmentationImageReceived = 0;
             int? frameStart = null;
-            Action<int, NativeArray<uint>> onSegmentationImageReceived = (frameCount, data) =>
+            Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived = (frameCount, data, tex) =>
             {
                 if (frameStart == null || frameStart > frameCount)
                     return;
@@ -81,7 +81,7 @@ namespace GroundTruthTests
                 var skinnedMeshRenderer = planeObject.AddComponent<SkinnedMeshRenderer>();
                 skinnedMeshRenderer.sharedMesh = meshFilter.sharedMesh;
                 skinnedMeshRenderer.material = meshRenderer.material;
-                
+
                 Object.DestroyImmediate(oldObject);
             }
             planeObject.transform.SetPositionAndRotation(new Vector3(0, 0, 10), Quaternion.Euler(90, 0, 0));
@@ -108,7 +108,7 @@ namespace GroundTruthTests
 
             //TestHelper.LoadAndStartRenderDocCapture(out var gameView);
 
-            Action<int, NativeArray<uint>> onSegmentationImageReceived = (frameCount, data) =>
+            Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived = (frameCount, data, tex) =>
             {
                 if (expectedLabelAtFrame == null || !expectedLabelAtFrame.ContainsKey(frameCount))
                     return;
@@ -164,42 +164,23 @@ namespace GroundTruthTests
             Assert.AreEqual(3, timesSegmentationImageReceived);
         }
 
-        GameObject SetupCamera(Action<int, NativeArray<uint>> onSegmentationImageReceived)
+        GameObject SetupCamera(Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived)
         {
             var cameraObject = new GameObject();
             cameraObject.SetActive(false);
             var camera = cameraObject.AddComponent<Camera>();
             camera.orthographic = true;
             camera.orthographicSize = 1;
-
-#if HDRP_PRESENT
-            cameraObject.AddComponent<HDAdditionalCameraData>();
-            var customPassVolume = cameraObject.AddComponent<CustomPassVolume>();
-            customPassVolume.isGlobal = true;
-            var rt = new RenderTexture(128, 128, 1, GraphicsFormat.R8G8B8A8_UNorm);
-            rt.Create();
-            var instanceSegmentationPass = new InstanceSegmentationPass();
-            instanceSegmentationPass.targetCamera = camera;
-            instanceSegmentationPass.targetTexture = rt;
-            customPassVolume.customPasses.Add(instanceSegmentationPass);
-            instanceSegmentationPass.name = nameof(instanceSegmentationPass);
-            instanceSegmentationPass.EnsureInit();
-
-            var reader = cameraObject.AddComponent<ImageReaderBehaviour>();
-            reader.source = rt;
-            reader.cameraSource = camera;
-
-            reader.SegmentationImageReceived += onSegmentationImageReceived;
-#endif
-#if URP_PRESENT
             var labelingConfiguration = ScriptableObject.CreateInstance<LabelingConfiguration>();
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = false;
             perceptionCamera.produceBoundingBoxAnnotations = false;
             perceptionCamera.produceObjectCountAnnotations = true;
-            perceptionCamera.segmentationImageReceived += onSegmentationImageReceived;
-#endif
+
+            var instanceSegmentationLabeler = cameraObject.AddComponent<InstanceSegmentationLabeler>();
+            instanceSegmentationLabeler.InstanceSegmentationImageReadback += onSegmentationImageReceived;
+
             AddTestObjectForCleanup(cameraObject);
             cameraObject.SetActive(true);
             return cameraObject;

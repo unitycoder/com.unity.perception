@@ -110,37 +110,15 @@ namespace GroundTruthTests
             camera.orthographic = true;
             camera.orthographicSize = 1;
 
-#if HDRP_PRESENT
-            cameraObject.AddComponent<HDAdditionalCameraData>();
-            var customPassVolume = cameraObject.AddComponent<CustomPassVolume>();
-            customPassVolume.isGlobal = true;
-            var rt = new RenderTexture(128, 128, 1, GraphicsFormat.R8G8B8A8_UNorm);
-            rt.Create();
-            var instanceSegmentationPass = new InstanceSegmentationPass()
-            {
-                targetCamera = camera,
-                targetTexture = rt
-            };
-            instanceSegmentationPass.name = nameof(instanceSegmentationPass);
-            instanceSegmentationPass.EnsureInit();
-            customPassVolume.customPasses.Add(instanceSegmentationPass);
-            var objectCountPass = new ObjectCountPass(camera);
-            objectCountPass.SegmentationTexture = rt;
-            objectCountPass.LabelingConfiguration = labelingConfiguration;
-            objectCountPass.name = nameof(objectCountPass);
-            customPassVolume.customPasses.Add(objectCountPass);
-
-            objectCountPass.ClassCountsReceived += onClassCountsReceived;
-#endif
-#if URP_PRESENT
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = false;
             perceptionCamera.produceBoundingBoxAnnotations = false;
             perceptionCamera.produceObjectCountAnnotations = true;
             perceptionCamera.classCountsReceived += onClassCountsReceived;
-#endif
+            cameraObject.AddComponent<InstanceSegmentationLabeler>();
             cameraObject.SetActive(true);
+
             return cameraObject;
         }
     }

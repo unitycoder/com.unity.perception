@@ -1,5 +1,6 @@
 #if URP_PRESENT
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -61,9 +62,8 @@ namespace UnityEngine.Perception.GroundTruth
             if (!EditorApplication.isPlaying)
                 return;
 #endif
-
-            renderer.EnqueuePass(perceptionCamera.instanceSegmentationUrpPass);
-            renderer.EnqueuePass(perceptionCamera.semanticSegmentationUrpPass);
+            foreach (var pass in perceptionCamera.passes)
+                renderer.EnqueuePass(pass);
         }
     }
 }
