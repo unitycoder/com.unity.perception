@@ -29,11 +29,9 @@ namespace UnityEngine.Perception.GroundTruth
     [RequireComponent(typeof(Camera))]
     public class PerceptionCamera : MonoBehaviour
     {
-        const string k_SemanticSegmentationDirectory = "SemanticSegmentation";
         //TODO: Remove the Guid path when we have proper dataset merging in USim/Thea
         internal static string RgbDirectory { get; } = $"RGB{Guid.NewGuid()}";
         static string s_RgbFilePrefix = "rgb_";
-        const string k_SegmentationFilePrefix = "segmentation_";
 
         /// <summary>
         /// A human-readable description of the camera.
@@ -52,22 +50,9 @@ namespace UnityEngine.Perception.GroundTruth
         /// </summary>
         public bool captureRgbImages = true;
         /// <summary>
-        /// Whether semantic segmentation images should be generated
-        /// </summary>
-        public bool produceSegmentationImages = true;
-        /// <summary>
-        /// The LabelingConfiguration to use for segmentation and object count.
-        /// </summary>
-        public LabelingConfiguration LabelingConfiguration;
-        /// <summary>
         /// Event invoked after the camera finishes rendering during a frame.
         /// </summary>
         public event Action BeginRendering;
-
-        [NonSerialized]
-        internal RenderTexture semanticSegmentationTexture;
-
-        RenderTextureReader<short> m_SemanticSegmentationTextureReader;
         Dictionary<string, object> m_PersistentSensorData = new Dictionary<string, object>();
 
 #if URP_PRESENT
@@ -86,14 +71,6 @@ namespace UnityEngine.Perception.GroundTruth
         /// The <see cref="SensorHandle"/> associated with this camera. Use this to report additional annotations and metrics at runtime.
         /// </summary>
         public SensorHandle SensorHandle { get; private set; }
-
-        struct AsyncSemanticSegmentationWrite
-        {
-            public short[] dataArray;
-            public int width;
-            public int height;
-            public string path;
-        }
         struct AsyncCaptureInfo
         {
             public int FrameCount;
@@ -105,28 +82,9 @@ namespace UnityEngine.Perception.GroundTruth
 
         List<AsyncCaptureInfo> m_AsyncCaptureInfos = new List<AsyncCaptureInfo>();
 
-#if HDRP_PRESENT
-        SemanticSegmentationPass m_SemanticSegmentationPass;
-#endif
-        MetricDefinition m_ObjectCountMetricDefinition;
-        AnnotationDefinition m_BoundingBoxAnnotationDefinition;
-        AnnotationDefinition m_SemanticSegmentationAnnotationDefinition;
-        MetricDefinition m_RenderedObjectInfoMetricDefinition;
-
         static ProfilerMarker s_WriteFrame = new ProfilerMarker("Write Frame (PerceptionCamera)");
         static ProfilerMarker s_FlipY = new ProfilerMarker("Flip Y (PerceptionCamera)");
         static ProfilerMarker s_EncodeAndSave = new ProfilerMarker("Encode and save (PerceptionCamera)");
-
-        [SuppressMessage("ReSharper", "InconsistentNaming")]
-        struct SemanticSegmentationSpec
-        {
-            [UsedImplicitly]
-            public int label_id;
-            [UsedImplicitly]
-            public string label_name;
-            [UsedImplicitly]
-            public int pixel_value;
-        }
 
         /// <summary>
         /// Add a data object which will be added to the dataset with each capture. Overrides existing sensor data associated with the given key.
@@ -159,71 +117,8 @@ namespace UnityEngine.Perception.GroundTruth
             var width = myCamera.pixelWidth;
             var height = myCamera.pixelHeight;
 
-            if (produceSegmentationImages && LabelingConfiguration == null)
-            {
-                Debug.LogError("LabelingConfiguration must be set if producing ground truth data");
-                produceSegmentationImages = false;
-            }
-
-            semanticSegmentationTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
-            semanticSegmentationTexture.name = "Labeling";
-
-#if HDRP_PRESENT
-            var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
-            customPassVolume.injectionPoint = CustomPassInjectionPoint.BeforeRendering;
-            customPassVolume.isGlobal = true;
-            m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, semanticSegmentationTexture, LabelingConfiguration)
-            {
-                name = "Labeling Pass"
-            };
-
-            SetupPasses(customPassVolume);
-#endif
-#if URP_PRESENT
-            AddScriptableRenderPass(new SemanticSegmentationUrpPass(myCamera, semanticSegmentationTexture, LabelingConfiguration));
-#endif
-
-            if (produceSegmentationImages)
-            {
-                var specs = LabelingConfiguration.LabelEntries.Select((l) => new SemanticSegmentationSpec()
-                {
-                    label_id = l.id,
-                    label_name = l.label,
-                    pixel_value = l.value
-                }).ToArray();
-
-                m_SemanticSegmentationAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("semantic segmentation", specs, "pixel-wise semantic segmentation label", "PNG");
-
-                m_SemanticSegmentationTextureReader = new RenderTextureReader<short>(semanticSegmentationTexture, myCamera,
-                    (frameCount, data, tex) => OnSemanticSegmentationImageRead(frameCount, data));
-            }
-
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
-        }
-
-#if HDRP_PRESENT
-        void SetupPasses(CustomPassVolume customPassVolume)
-        {
-            customPassVolume.customPasses.Remove(m_SemanticSegmentationPass);
-
-            if (produceSegmentationImages)
-                customPassVolume.customPasses.Add(m_SemanticSegmentationPass);
-        }
-#endif
-
-        (int index, AsyncCaptureInfo asyncCaptureInfo) FindAsyncCaptureInfo(int frameCount)
-        {
-            for (var i = 0; i < m_AsyncCaptureInfos.Count; i++)
-            {
-                var captureInfo = m_AsyncCaptureInfos[i];
-                if (captureInfo.FrameCount == frameCount)
-                {
-                    return (i, captureInfo);
-                }
-            }
-
-            return (-1, default);
         }
 
         // Update is called once per frame
@@ -234,27 +129,6 @@ namespace UnityEngine.Perception.GroundTruth
 
             var cam = GetComponent<Camera>();
             cam.enabled = SensorHandle.ShouldCaptureThisFrame;
-
-            m_AsyncCaptureInfos.RemoveSwapBack(i =>
-                !i.SegmentationAsyncAnnotation.IsPending &&
-                !i.BoundingBoxAsyncMetric.IsPending &&
-                !i.RenderedObjectInfoAsyncMetric.IsPending &&
-                !i.ClassCountAsyncMetric.IsPending);
-        }
-
-        void ReportAsyncAnnotations()
-        {
-            if (produceSegmentationImages)
-            {
-                var captureInfo = new AsyncCaptureInfo()
-                {
-                    FrameCount = Time.frameCount
-                };
-                if (produceSegmentationImages)
-                    captureInfo.SegmentationAsyncAnnotation = SensorHandle.ReportAnnotationAsync(m_SemanticSegmentationAnnotationDefinition);
-
-                m_AsyncCaptureInfos.Add(captureInfo);
-            }
         }
 
         void CaptureRgbData(Camera cam)
@@ -335,10 +209,6 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnSimulationEnding()
         {
-            m_SemanticSegmentationTextureReader?.WaitForAllImages();
-            m_SemanticSegmentationTextureReader?.Dispose();
-            m_SemanticSegmentationTextureReader = null;
-
             RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
         }
 
@@ -351,7 +221,6 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
 #endif
             BeginRendering?.Invoke();
-            ReportAsyncAnnotations();
             CaptureRgbData(cam);
         }
 
@@ -361,53 +230,11 @@ namespace UnityEngine.Perception.GroundTruth
 
             OnSimulationEnding();
 
-            m_SemanticSegmentationTextureReader?.Dispose();
-            m_SemanticSegmentationTextureReader = null;
-
-            if (semanticSegmentationTexture != null)
-                semanticSegmentationTexture.Release();
-
             if (SensorHandle.IsValid)
                 SensorHandle.Dispose();
 
             SensorHandle = default;
-
-            semanticSegmentationTexture = null;
         }
 
-        void OnSemanticSegmentationImageRead(int frameCount, NativeArray<short> data)
-        {
-            var findResult = FindAsyncCaptureInfo(frameCount);
-            var asyncCaptureInfo = findResult.asyncCaptureInfo;
-
-            var dxLocalPath = Path.Combine(k_SemanticSegmentationDirectory, k_SegmentationFilePrefix) + frameCount + ".png";
-            var path = Path.Combine(Manager.Instance.GetDirectoryFor(k_SemanticSegmentationDirectory), k_SegmentationFilePrefix) + frameCount + ".png";
-            var annotation = asyncCaptureInfo.SegmentationAsyncAnnotation;
-            if (!annotation.IsValid)
-                return;
-
-            annotation.ReportFile(dxLocalPath);
-
-            var asyncRequest = Manager.Instance.CreateRequest<AsyncRequest<AsyncSemanticSegmentationWrite>>();
-            asyncRequest.data = new AsyncSemanticSegmentationWrite()
-            {
-                dataArray = data.ToArray(),
-                width = semanticSegmentationTexture.width,
-                height = semanticSegmentationTexture.height,
-                path = path
-            };
-            asyncRequest.Start((r) =>
-            {
-                Profiler.EndSample();
-                Profiler.BeginSample("Encode");
-                var pngBytes = ImageConversion.EncodeArrayToPNG(r.data.dataArray, GraphicsFormat.R8G8B8A8_UNorm, (uint)r.data.width, (uint)r.data.height);
-                Profiler.EndSample();
-                Profiler.BeginSample("WritePng");
-                File.WriteAllBytes(r.data.path, pngBytes);
-                Manager.Instance.ConsumerFileProduced(r.data.path);
-                Profiler.EndSample();
-                return AsyncRequest.Result.Completed;
-            });
-        }
     }
 }

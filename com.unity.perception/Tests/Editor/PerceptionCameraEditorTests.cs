@@ -63,10 +63,10 @@ namespace EditorTests
 #endif
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
-            perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = true;
             cameraObject.AddComponent<BoundingBoxLabeler>();
-            cameraObject.AddComponent<RenderedObjectInfoLabeler>();
+            var renderedObjectInfoLabeler = cameraObject.AddComponent<RenderedObjectInfoLabeler>();
+            renderedObjectInfoLabeler.labelingConfiguration = labelingConfiguration;
 
             cameraObject.SetActive(true);
         }

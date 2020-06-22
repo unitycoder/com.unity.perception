@@ -12,7 +12,6 @@ namespace UnityEngine.Perception.GroundTruth
     public class BoundingBoxLabeler : MonoBehaviour
     {
         public string annotationId = "F9F22E05-443F-4602-A422-EBE4EA9B55CB";
-        public LabelingConfiguration labelingConfiguration;
 
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxesReceived");
 
@@ -37,16 +36,9 @@ namespace UnityEngine.Perception.GroundTruth
 
         void Start()
         {
-            if (labelingConfiguration == null)
-            {
-                Debug.LogError("labelingConfiguration must be assigned.");
-                this.enabled = false;
-                return;
-            }
-
             m_PerceptionCamera = GetComponent<PerceptionCamera>();
             m_RenderedObjectInfoLabeler = GetComponent<RenderedObjectInfoLabeler>();
-            m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", labelingConfiguration.GetAnnotationSpecification(),
+            m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", m_RenderedObjectInfoLabeler.labelingConfiguration.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
             m_RenderedObjectInfoLabeler.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
 

@@ -106,7 +106,6 @@ namespace GroundTruthTests
             camera.orthographicSize = 1;
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
-            perceptionCamera.LabelingConfiguration = labelingConfiguration;
             perceptionCamera.captureRgbImages = false;
             cameraObject.AddComponent<InstanceSegmentationLabeler>();
             var renderedObjectInfoLabeler = cameraObject.AddComponent<RenderedObjectInfoLabeler>();
