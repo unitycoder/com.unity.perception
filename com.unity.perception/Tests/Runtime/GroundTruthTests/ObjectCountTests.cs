@@ -74,11 +74,6 @@ namespace GroundTruthTests
             yield return null;
 
             Object.DestroyImmediate(planeObject2);
-#if HDRP_PRESENT
-            //TODO: Remove this when DestroyImmediate properly calls Cleanup on the pass
-            var labelHistogramPass = (ObjectCountPass)cameraObject.GetComponent<CustomPassVolume>().customPasses.First(p => p is ObjectCountPass);
-            labelHistogramPass.WaitForAllRequests();
-#endif
             //destroy the object to force all pending segmented image readbacks to finish and events to be fired.
             DestroyTestObject(cameraObject);
 

@@ -1,6 +1,9 @@
 ﻿using System;
 using Unity.Collections;
 using UnityEngine.Experimental.Rendering;
+#if HDRP_PRESENT
+using UnityEngine.Rendering.HighDefinition;
+#endif
 
 namespace UnityEngine.Perception.GroundTruth {
     [AddComponentMenu("Perception/Labelers/InstanceSegmentationLabeler")]
@@ -14,7 +17,9 @@ namespace UnityEngine.Perception.GroundTruth {
 
         RenderTexture m_SegmentationTexture;
         RenderTextureReader<uint> m_SegmentationReader;
-
+#if HDRP_PRESENT
+        InstanceSegmentationPass m_SegmentationPass;
+#endif
 #if URP_PRESENT
         [NonSerialized]
         InstanceSegmentationUrpPass m_InstanceSegmentationUrpPass;
@@ -41,7 +46,7 @@ namespace UnityEngine.Perception.GroundTruth {
             {
                 name = "Segmentation Pass",
                 targetCamera = myCamera,
-                targetTexture = segmentationTexture
+                targetTexture = m_SegmentationTexture
             };
             m_SegmentationPass.EnsureInit();
             customPassVolume.customPasses.Add(m_SegmentationPass);

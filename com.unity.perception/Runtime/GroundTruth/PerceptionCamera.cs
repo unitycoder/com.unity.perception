@@ -13,10 +13,12 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
 using UnityEngine.Serialization;
 #if HDRP_PRESENT
 using UnityEngine.Rendering.HighDefinition;
+#endif
+#if URP_PRESENT
+using UnityEngine.Rendering.Universal;
 #endif
 
 namespace UnityEngine.Perception.GroundTruth
@@ -303,6 +305,7 @@ namespace UnityEngine.Perception.GroundTruth
                 }
                 else
                 {
+                    produceBoundingBoxAnnotations = produceObjectCountAnnotations = produceRenderedObjectInfoMetric = false;
                     Debug.Log("Missing InstanceSegmentationLabeler. Will not generate metrics.");
                 }
             }
