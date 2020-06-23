@@ -14,6 +14,8 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.Serialization;
+using UnityEngine.UI;
+
 #if HDRP_PRESENT
 using UnityEngine.Rendering.HighDefinition;
 #endif
@@ -26,6 +28,17 @@ namespace UnityEngine.Perception.GroundTruth
     [RequireComponent(typeof(Camera))]
     public class PerceptionCamera : MonoBehaviour
     {
+//        internal class TextureDataCache
+//        {
+//            byte[] m_DepthGroundTruth;
+//            const int k_BytesPerDepthPixel = 2;
+//
+//            internal TextureDataCache(int width, int height)
+//            {
+//                m_DepthGroundTruth = new byte[k_BytesPerDepthPixel * width * height];
+//            }
+//        }
+
         const string k_SemanticSegmentationDirectory = "SemanticSegmentation";
         //TODO: Remove the Guid path when we have proper dataset merging in USim/Thea
         internal static string RgbDirectory { get; } = $"RGB{Guid.NewGuid()}";
@@ -36,6 +49,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// A human-readable description of the camera.
         /// </summary>
         public string description;
+
         /// <summary>
         /// The period in seconds that the Camera should render
         /// </summary>
@@ -44,6 +58,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// The start time in seconds of the first frame in the simulation.
         /// </summary>
         public float startTime;
+        // TODO: Encapsulate capture options in a subsection of inspector window - make naming consistent
         /// <summary>
         /// Whether camera output should be captured to disk
         /// </summary>
@@ -56,6 +71,7 @@ namespace UnityEngine.Perception.GroundTruth
         /// Whether object counts should be computed
         /// </summary>
         public bool produceObjectCountAnnotations = true;
+        public bool captureDepth = true;
         /// <summary>
         /// The ID to use for object count annotations in the resulting dataset
         /// </summary>
@@ -99,6 +115,10 @@ namespace UnityEngine.Perception.GroundTruth
 
         internal event Action<NativeSlice<uint>, IReadOnlyList<LabelEntry>, int> classCountsReceived;
 
+        public bool DebugDepth = true;
+        Texture2D m_DepthTextureRaw;
+        public Texture2D DepthDebugTexture;
+
         [NonSerialized]
         internal RenderTexture labelingTexture;
         [NonSerialized]
@@ -108,6 +128,13 @@ namespace UnityEngine.Perception.GroundTruth
         RenderTextureReader<uint> m_SegmentationReader;
         RenderedObjectInfoGenerator m_RenderedObjectInfoGenerator;
         Dictionary<string, object> m_PersistentSensorData = new Dictionary<string, object>();
+
+        Queue<AsyncRequest<CaptureCamera.CaptureState>> m_CaptureRequests;
+        // Define a no-op functor for depth requests - Capture will simply return if no functor is defined
+        Func<AsyncRequest<CaptureCamera.CaptureState>, AsyncRequest.Result> m_DepthFunctor =
+            _ => AsyncRequest.Result.Completed;
+
+        Array m_MostRecentDepthBuffer;
 
 #if URP_PRESENT
         [NonSerialized]
@@ -124,6 +151,9 @@ namespace UnityEngine.Perception.GroundTruth
         /// The <see cref="SensorHandle"/> associated with this camera. Use this to report additional annotations and metrics at runtime.
         /// </summary>
         public SensorHandle SensorHandle { get; private set; }
+
+//        Func<AsyncRequest<CaptureCamera.CaptureState>, AsyncRequest.Result> m_DepthBufferFunctor =
+//            r =>
 
         struct AsyncSemanticSegmentationWrite
         {
@@ -229,8 +259,9 @@ namespace UnityEngine.Perception.GroundTruth
         // Start is called before the first frame update
         void Awake()
         {
-            //CaptureOptions.useAsyncReadbackIfSupported = false;
 
+            //CaptureOptions.useAsyncReadbackIfSupported = false;
+            // TODO: Review what in here should be moved to OnValidate
             m_EgoMarker = this.GetComponentInParent<Ego>();
             var ego = m_EgoMarker == null ? SimulationManager.RegisterEgo("") : m_EgoMarker.EgoHandle;
             SensorHandle = SimulationManager.RegisterSensor(ego, "camera", description, period, startTime);
@@ -238,6 +269,14 @@ namespace UnityEngine.Perception.GroundTruth
             var myCamera = GetComponent<Camera>();
             var width = myCamera.pixelWidth;
             var height = myCamera.pixelHeight;
+            myCamera.depthTextureMode = DepthTextureMode.Depth;
+            if (DebugDepth)
+            {
+                m_DepthTextureRaw = new Texture2D(width, height, TextureFormat.R16, false);
+                DepthDebugTexture = new Texture2D(width, height, DefaultFormat.LDR, TextureCreationFlags.None);
+                var canvasImage = GetComponentInChildren<RawImage>();
+                canvasImage.texture = DepthDebugTexture;
+            }
 
             if ((produceSegmentationImages || produceObjectCountAnnotations || produceBoundingBoxAnnotations) && LabelingConfiguration == null)
             {
@@ -251,6 +290,9 @@ namespace UnityEngine.Perception.GroundTruth
             segmentationTexture.name = "Segmentation";
             labelingTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
             labelingTexture.name = "Labeling";
+
+            // TODO: Evaluate queue size and hard-code to named variable or parameterize
+            m_CaptureRequests = new Queue<AsyncRequest<CaptureCamera.CaptureState>>(2);
 
 #if HDRP_PRESENT
             var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
@@ -337,6 +379,25 @@ namespace UnityEngine.Perception.GroundTruth
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
+        }
+
+        // TODO: Group with rest of Unity built-ins?
+        // Update is called once per frame
+        void Update()
+        {
+            if (!SensorHandle.IsValid)
+                return;
+
+            var cam = GetComponent<Camera>();
+            cam.enabled = SensorHandle.ShouldCaptureThisFrame;
+
+            CheckAndUpdateCaptureRequests();
+
+            m_AsyncCaptureInfos.RemoveSwapBack(i =>
+                !i.SegmentationAsyncAnnotation.IsPending &&
+                !i.BoundingBoxAsyncMetric.IsPending &&
+                !i.RenderedObjectInfoAsyncMetric.IsPending &&
+                !i.ClassCountAsyncMetric.IsPending);
         }
 
         // ReSharper disable InconsistentNaming
@@ -450,6 +511,20 @@ namespace UnityEngine.Perception.GroundTruth
             return m_RenderedObjectInfoGenerator.TryGetLabelEntryFromInstanceId(instanceId, out labelEntry);
         }
 
+        public bool TryGetDepthCapture(out byte[] depthBuffer)
+        {
+            CheckAndUpdateCaptureRequests();
+
+            if (m_MostRecentDepthBuffer != null)
+            {
+                depthBuffer = ArrayUtilities.Cast<byte>(m_MostRecentDepthBuffer);
+                return true;
+            }
+
+            depthBuffer = new byte[0];
+            return false;
+        }
+
         void OnObjectCountsReceived(NativeSlice<uint> counts, IReadOnlyList<LabelEntry> entries, int frameCount)
         {
             using (s_ClassCountCallback.Auto())
@@ -496,20 +571,46 @@ namespace UnityEngine.Perception.GroundTruth
             return (-1, default);
         }
 
-        // Update is called once per frame
-        void Update()
+        void CheckAndUpdateCaptureRequests()
         {
-            if (!SensorHandle.IsValid)
-                return;
+            while (m_CaptureRequests.Count > 0 &&
+                (m_CaptureRequests.Peek().completed || m_CaptureRequests.Peek().error))
+            {
+                var request = m_CaptureRequests.Dequeue();
 
-            var cam = GetComponent<Camera>();
-            cam.enabled = SensorHandle.ShouldCaptureThisFrame;
+                if (request.data.depthBuffer != null)
+                {
+                    // If we had multiple completed requests, some may get discarded here - we assume the most recent
+                    // buffer is the only one relevant for main thread uses
+                    m_MostRecentDepthBuffer = (Array)request.data.depthBuffer;
+                    if (DebugDepth)
+                    {
+                        var buffer = (byte[])m_MostRecentDepthBuffer;
 
-            m_AsyncCaptureInfos.RemoveSwapBack(i =>
-                !i.SegmentationAsyncAnnotation.IsPending &&
-                !i.BoundingBoxAsyncMetric.IsPending &&
-                !i.RenderedObjectInfoAsyncMetric.IsPending &&
-                !i.ClassCountAsyncMetric.IsPending);
+                        m_DepthTextureRaw.LoadRawTextureData(buffer);
+                        m_DepthTextureRaw.Apply();
+                        var pixels = m_DepthTextureRaw.GetPixels();
+                        var viewableColors = new Color[pixels.Length];
+                        var min = 1.0f;
+                        var max = 0.0f;
+                        for (var i = 0; i < pixels.Length; i++)
+                        {
+                            var p = pixels[i];
+                            var r = p.r;
+                            min = Math.Min(min, r);
+                            max = Math.Max(max, r);
+                            // >>> TODO: Implement a better normalization of this value
+                            r = Math.Min(10f * r, 1f);
+                            viewableColors[i] = new Color(r, r, r, 1.0f);
+                        }
+                        DepthDebugTexture.SetPixels(viewableColors);
+                        DepthDebugTexture.Apply();
+                        Debug.Log(
+                            $"Depth Debug -- Buffer Length: {buffer.Length} -- Num Pixels: {pixels.Length} " +
+                            $"Texture Size: {m_DepthTextureRaw.width} x {m_DepthTextureRaw.height} -- Max: {max}  Min: {min}");
+                    }
+                }
+            }
         }
 
         void ReportAsyncAnnotations()
@@ -536,6 +637,19 @@ namespace UnityEngine.Perception.GroundTruth
             }
         }
 
+        void EnqueueCaptureRequests(Camera cam)
+        {
+            Profiler.BeginSample("EnqueueCaptureRequests");
+            // TODO: Ensure the PerceptionCamera is configured to request depth
+
+            // TODO: Consolidate capture requests into single function - create a clearer delineation from what operates
+            //       within the scope of CaptureCamera.Capture and what is extra, custom code
+
+            m_CaptureRequests.Enqueue(CaptureCamera.Capture(cam, depthFunctor: m_DepthFunctor));
+
+            Profiler.EndSample();
+        }
+
         void CaptureRgbData(Camera cam)
         {
             Profiler.BeginSample("CaptureDataFromLastFrame");
@@ -556,7 +670,8 @@ namespace UnityEngine.Perception.GroundTruth
                 using (s_WriteFrame.Auto())
                 {
                     var dataColorBuffer = (byte[])r.data.colorBuffer;
-                    if (flipY)
+                    // >>> TODO: REMOVE - temporarily disabling FlipY
+                    if (false && flipY)
                         FlipImageY(dataColorBuffer, height);
 
                     byte[] encodedData;
@@ -634,6 +749,7 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
 #endif
             ReportAsyncAnnotations();
+            EnqueueCaptureRequests(cam);
             CaptureRgbData(cam);
         }
 
