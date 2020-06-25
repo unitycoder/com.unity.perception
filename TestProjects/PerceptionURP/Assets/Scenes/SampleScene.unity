@@ -475,7 +475,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 6.25e-43, y: 1.0156355e+12, z: 6.25e-43, w: 2.8676e-41}
+  m_BoundingSphereOverride: {x: 1e-45, y: 9e-44, z: 9e-44, w: 0}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0
@@ -519,6 +519,8 @@ GameObject:
   - component: {fileID: 963194229}
   - component: {fileID: 963194227}
   - component: {fileID: 963194231}
+  - component: {fileID: 963194236}
+  - component: {fileID: 963194235}
   - component: {fileID: 963194234}
   - component: {fileID: 963194233}
   - component: {fileID: 963194232}
@@ -641,9 +643,6 @@ MonoBehaviour:
   period: 0.0166
   startTime: 0
   captureRgbImages: 1
-  produceSegmentationImages: 1
-  LabelingConfiguration: {fileID: 11400000, guid: e74234fe725079e4aa7ecd74797ceb79,
-    type: 2}
 --- !u!114 &963194231
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -667,15 +666,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 963194225}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c2fcc6ce8ec34a44ae0f1679f25b6fb4, type: 3}
+  m_Script: {fileID: 11500000, guid: 60775aefebb84bf49aff98525a6f7b55, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  produceObjectInfoMetrics: 0
-  objectInfoMetricId: 5BA92024-B3B7-41A7-9D3F-C03A6A8DDD01
-  produceObjectCountMetrics: 0
-  objectCountMetricId: 51DA3C27-369D-4929-AEA6-D01614635CE2
-  labelingConfiguration: {fileID: 11400000, guid: e74234fe725079e4aa7ecd74797ceb79,
-    type: 2}
+  totalFrames: 1000
 --- !u!114 &963194233
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -683,12 +677,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0127208de324c00a881af84cdd63da3, type: 3}
+  m_Script: {fileID: 11500000, guid: 6c08fb5eff78425db5567cf66f9cb3fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  annotationId: F9F22E05-443F-4602-A422-EBE4EA9B55CB
+  annotationId: 12F94D8D-5425-4DEB-9B21-5E53AD957D66
   labelingConfiguration: {fileID: 11400000, guid: e74234fe725079e4aa7ecd74797ceb79,
     type: 2}
 --- !u!114 &963194234
@@ -698,7 +692,38 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_Enabled: 1
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0127208de324c00a881af84cdd63da3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  annotationId: F9F22E05-443F-4602-A422-EBE4EA9B55CB
+--- !u!114 &963194235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 963194225}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c2fcc6ce8ec34a44ae0f1679f25b6fb4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  produceObjectInfoMetrics: 1
+  objectInfoMetricId: 5BA92024-B3B7-41A7-9D3F-C03A6A8DDD01
+  produceObjectCountMetrics: 1
+  objectCountMetricId: 51DA3C27-369D-4929-AEA6-D01614635CE2
+  labelingConfiguration: {fileID: 11400000, guid: e74234fe725079e4aa7ecd74797ceb79,
+    type: 2}
+--- !u!114 &963194236
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 963194225}
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 43085b9d882c415b90fb9ebe4d765f26, type: 3}
   m_Name: 
@@ -717,7 +742,7 @@ GameObject:
   - component: {fileID: 1640252284}
   - component: {fileID: 1640252280}
   m_Layer: 0
-  m_Name: Box
+  m_Name: Box1234
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
