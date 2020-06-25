@@ -165,6 +165,10 @@ namespace UnityEngine.Perception.GroundTruth
             public float height;
         }
 
+        private GameObject boxQuad = null;
+        private GameObject cubeQuad = null;
+        private GameObject crateQuad = null;
+
         ClassCountValue[] m_ClassCountValues;
         BoundingBoxValue[] m_BoundingBoxValues;
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
@@ -337,6 +341,10 @@ namespace UnityEngine.Perception.GroundTruth
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
+
+            boxQuad = GameObject.Find("BoxQuad");
+            cubeQuad = GameObject.Find("CubeQuad");
+            crateQuad = GameObject.Find("CrateQuad");
         }
 
         // ReSharper disable InconsistentNaming
@@ -430,6 +438,33 @@ namespace UnityEngine.Perception.GroundTruth
                         width = objectInfo.boundingBox.width,
                         height = objectInfo.boundingBox.height,
                     };
+
+                    GameObject active = crateQuad;
+                    if (labelEntry.label == "Box") active = boxQuad;
+                    else if (labelEntry.label == "Cube") active = cubeQuad;
+
+                    var cam = GetComponent<Camera>();
+                    var height = cam.pixelHeight;
+
+                    var halfHeight = height * 0.5f;
+
+                    var y = halfHeight + (halfHeight - objectInfo.boundingBox.y);
+
+                    Vector3 ll = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x, y, 1));
+                    Vector3 ul = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x, y - objectInfo.boundingBox.height, 1));
+                    Vector3 ur = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x + objectInfo.boundingBox.width, y - objectInfo.boundingBox.height, 1));
+                    Vector3 lr = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x + objectInfo.boundingBox.width, y, 1));
+                        
+                    Vector3[] verts = new Vector3[4] {ll, ul, ur, lr};
+                    int[] tris = new int[6] {0, 2, 1, 0, 3, 2};
+                    Vector2[] uvs = new Vector2[4] {Vector2.zero, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
+
+                    var filter = active.GetComponent<MeshFilter>();
+                    Mesh mesh = new Mesh();
+                    mesh.vertices = verts;
+                    mesh.triangles = tris;
+                    mesh.uv = uvs;
+                    filter.mesh = mesh;
                 }
 
                 boundingBoxAsyncAnnotation.ReportValues(m_BoundingBoxValues);
