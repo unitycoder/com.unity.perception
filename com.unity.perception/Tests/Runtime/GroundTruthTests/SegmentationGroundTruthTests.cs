@@ -45,12 +45,22 @@ namespace GroundTruthTests
     [UnityPlatform(exclude = new[] {RuntimePlatform.LinuxEditor, RuntimePlatform.LinuxPlayer})]
     public class SegmentationPassTests : GroundTruthTestBase
     {
+        const int k_SemanticPixelValue = 4;
+
+        public enum SegmentationKind
+        {
+            Instance,
+            Semantic
+        }
         // A UnityTest behaves like a coroutine in Play Mode. In Edit Mode you can use
         // `yield return null;` to skip a frame.
         [UnityTest]
-        public IEnumerator SegmentationPassTestsWithEnumeratorPasses([Values(false, true)] bool useSkinnedMeshRenderer)
+        public IEnumerator SegmentationPassTestsWithEnumeratorPasses(
+            [Values(false, true)] bool useSkinnedMeshRenderer,
+            [Values(SegmentationKind.Instance, SegmentationKind.Semantic)] SegmentationKind segmentationKind)
         {
             int timesSegmentationImageReceived = 0;
+            int expectedPixelValue = segmentationKind == SegmentationKind.Instance ? 1 : k_SemanticPixelValue;
             int? frameStart = null;
             Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived = (frameCount, data, tex) =>
             {
@@ -58,10 +68,10 @@ namespace GroundTruthTests
                     return;
 
                 timesSegmentationImageReceived++;
-                CollectionAssert.AreEqual(Enumerable.Repeat(1, data.Length), data);
+                CollectionAssert.AreEqual(Enumerable.Repeat(expectedPixelValue, data.Length), data);
             };
 
-            var cameraObject = SetupCamera(onSegmentationImageReceived);
+            var cameraObject = SetupCamera(segmentationKind, onSegmentationImageReceived);
             //
             // // Arbitrary wait for 5 frames for shaders to load. Workaround for issue with Shader.WarmupAllShaders()
             // for (int i=0 ; i<5 ; ++i)
@@ -101,7 +111,8 @@ namespace GroundTruthTests
         }
 
         [UnityTest]
-        public IEnumerator SegmentationPassProducesCorrectValuesEachFrame()
+        public IEnumerator SegmentationPassProducesCorrectValuesEachFrame(
+            [Values(SegmentationKind.Instance, SegmentationKind.Semantic)] SegmentationKind segmentationKind)
         {
             int timesSegmentationImageReceived = 0;
             Dictionary<int, int> expectedLabelAtFrame = null;
@@ -130,13 +141,14 @@ namespace GroundTruthTests
                 }
             };
 
-            var cameraObject = SetupCamera(onSegmentationImageReceived);
+            var cameraObject = SetupCamera(segmentationKind, onSegmentationImageReceived);
 
+            int expectedPixelValue = segmentationKind == SegmentationKind.Instance ? 1 : k_SemanticPixelValue;
             expectedLabelAtFrame = new Dictionary<int, int>
             {
-                {Time.frameCount    , 1},
-                {Time.frameCount + 1, 1},
-                {Time.frameCount + 2, 1}
+                {Time.frameCount    , expectedPixelValue},
+                {Time.frameCount + 1, expectedPixelValue},
+                {Time.frameCount + 2, expectedPixelValue}
             };
             GameObject planeObject;
 
@@ -164,7 +176,7 @@ namespace GroundTruthTests
             Assert.AreEqual(3, timesSegmentationImageReceived);
         }
 
-        GameObject SetupCamera(Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived)
+        GameObject SetupCamera(SegmentationKind segmentationKind, Action<int, NativeArray<uint>, RenderTexture> onSegmentationImageReceived)
         {
             var cameraObject = new GameObject();
             cameraObject.SetActive(false);
@@ -173,9 +185,23 @@ namespace GroundTruthTests
             camera.orthographicSize = 1;
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.captureRgbImages = false;
-
-            var instanceSegmentationLabeler = cameraObject.AddComponent<InstanceSegmentationLabeler>();
-            instanceSegmentationLabeler.InstanceSegmentationImageReadback += onSegmentationImageReceived;
+            if (segmentationKind == SegmentationKind.Instance)
+                perceptionCamera.InstanceSegmentationImageReadback += onSegmentationImageReceived;
+            else
+            {
+                var labelConfig = new SemanticSegmentationLabelConfig();
+                labelConfig.LabelEntries = new List<SemanticSegmentationLabelEntry>()
+                {
+                    new SemanticSegmentationLabelEntry()
+                    {
+                        label = "label",
+                        pixelValue = k_SemanticPixelValue
+                    }
+                };
+                var semanticSegmentationLabeler = new SemanticSegmentationLabeler(labelConfig);
+                semanticSegmentationLabeler.SemanticSegmentationImageReadback += onSegmentationImageReceived;
+                perceptionCamera.labelers.Add(semanticSegmentationLabeler);
+            }
 
             AddTestObjectForCleanup(cameraObject);
             cameraObject.SetActive(true);

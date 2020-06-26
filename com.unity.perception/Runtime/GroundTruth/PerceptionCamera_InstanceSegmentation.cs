@@ -34,14 +34,13 @@ namespace UnityEngine.Perception.GroundTruth
 
         void SetupInstanceSegmentation()
         {
-            var camera = PerceptionCamera.GetComponent<Camera>();
+            var camera = GetComponent<Camera>();
             var width = camera.pixelWidth;
             var height = camera.pixelHeight;
             m_InstanceSegmentationTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
             m_InstanceSegmentationTexture.name = "InstanceSegmentation";
 
             m_RenderedObjectInfoGenerator = new RenderedObjectInfoGenerator();
-            World.DefaultGameObjectInjectionWorld.GetExistingSystem<GroundTruthLabelSetupSystem>().Activate(m_RenderedObjectInfoGenerator);
 
 #if HDRP_PRESENT
             var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
@@ -63,6 +62,12 @@ namespace UnityEngine.Perception.GroundTruth
             m_InstanceSegmentationReader = new RenderTextureReader<uint>(m_InstanceSegmentationTexture, camera, (frameCount, data, tex) =>
             {
                 InstanceSegmentationImageReadback?.Invoke(frameCount, data, tex);
+                if (RenderedObjectInfosCalculated != null)
+                {
+                    m_RenderedObjectInfoGenerator.Compute(data, tex.width, BoundingBoxOrigin.TopLeft, out var renderedObjectInfos, Allocator.Temp);
+                    RenderedObjectInfosCalculated?.Invoke(frameCount, renderedObjectInfos);
+                    renderedObjectInfos.Dispose();
+                }
             });
         }
 

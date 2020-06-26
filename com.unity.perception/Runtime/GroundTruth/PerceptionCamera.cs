@@ -74,16 +74,6 @@ namespace UnityEngine.Perception.GroundTruth
         /// The <see cref="SensorHandle"/> associated with this camera. Use this to report additional annotations and metrics at runtime.
         /// </summary>
         public SensorHandle SensorHandle { get; private set; }
-        struct AsyncCaptureInfo
-        {
-            public int FrameCount;
-            public AsyncAnnotation SegmentationAsyncAnnotation;
-            public AsyncMetric ClassCountAsyncMetric;
-            public AsyncMetric RenderedObjectInfoAsyncMetric;
-            public AsyncAnnotation BoundingBoxAsyncMetric;
-        }
-
-        List<AsyncCaptureInfo> m_AsyncCaptureInfos = new List<AsyncCaptureInfo>();
 
         static ProfilerMarker s_WriteFrame = new ProfilerMarker("Write Frame (PerceptionCamera)");
         static ProfilerMarker s_FlipY = new ProfilerMarker("Flip Y (PerceptionCamera)");
@@ -235,26 +225,6 @@ namespace UnityEngine.Perception.GroundTruth
 
             SensorHandle = default;
             CleanUpInstanceSegmentation();
-        }
-    }
-
-    [Serializable]
-    public abstract class CameraLabeler
-    {
-        public bool enabled;
-        public bool foldout;
-
-        protected PerceptionCamera PerceptionCamera { get; private set; }
-        protected SensorHandle SensorHandle { get; private set; }
-
-        public abstract void Setup();
-        public virtual void OnUpdate() {}
-        public virtual void OnBeginRendering() {}
-
-        internal void Init(PerceptionCamera perceptionCamera)
-        {
-            PerceptionCamera = perceptionCamera;
-            SensorHandle = perceptionCamera.SensorHandle;
         }
     }
 }

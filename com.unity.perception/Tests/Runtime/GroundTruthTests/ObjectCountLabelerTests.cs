@@ -20,15 +20,20 @@ namespace GroundTruthTests
     //Graphics issues with OpenGL Linux Editor. https://jira.unity3d.com/browse/AISV-422
     [UnityPlatform(exclude = new[] {RuntimePlatform.LinuxEditor, RuntimePlatform.LinuxPlayer})]
     [TestFixture]
-    class ObjectCountTests : GroundTruthTestBase
+    class ObjectCountLabelerTests : GroundTruthTestBase
     {
+        [Test]
+        public void NullLabelingConfiguration_ProducesInvalidOperationException()
+        {
+            Assert.Throws<InvalidOperationException>(() => new ObjectCountLabeler(null).Setup());
+        }
         [UnityTest]
         public IEnumerator ProducesCorrectValuesWithChangingObjects()
         {
             var label = "label";
             var labelingConfiguration = ScriptableObject.CreateInstance<LabelingConfiguration>();
 
-            labelingConfiguration.LabelEntries = new List<LabelEntry>
+            labelingConfiguration.Init(new List<LabelEntry>
             {
                 new LabelEntry
                 {
@@ -36,11 +41,11 @@ namespace GroundTruthTests
                     label = label,
                     value = 500
                 }
-            };
+            });
 
             var receivedResults = new List<(uint[] counts, LabelEntry[] labels, int frameCount)>();
 
-            var cameraObject = SetupCamera(labelingConfiguration, (counts, labels, frameCount) =>
+            var cameraObject = SetupCamera(labelingConfiguration, (frameCount, counts, labels) =>
             {
                 receivedResults.Add((counts.ToArray(), labels.ToArray(), frameCount));
             });
@@ -97,7 +102,7 @@ namespace GroundTruthTests
         }
 
         static GameObject SetupCamera(LabelingConfiguration labelingConfiguration,
-            Action<NativeSlice<uint>, IReadOnlyList<LabelEntry>, int> onClassCountsReceived)
+            Action<int, NativeSlice<uint>, IReadOnlyList<LabelEntry>> onClassCountsReceived)
         {
             var cameraObject = new GameObject();
             cameraObject.SetActive(false);
@@ -107,10 +112,9 @@ namespace GroundTruthTests
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.captureRgbImages = false;
-            cameraObject.AddComponent<InstanceSegmentationLabeler>();
-            var renderedObjectInfoLabeler = cameraObject.AddComponent<RenderedObjectInfoLabeler>();
-            renderedObjectInfoLabeler.labelingConfiguration = labelingConfiguration;
-            renderedObjectInfoLabeler.classCountsReceived += onClassCountsReceived;
+            var classCountLabeler = new ObjectCountLabeler(labelingConfiguration);
+            classCountLabeler.ObjectCountsComputed += onClassCountsReceived;
+            perceptionCamera.labelers.Add(classCountLabeler);
             cameraObject.SetActive(true);
 
             return cameraObject;

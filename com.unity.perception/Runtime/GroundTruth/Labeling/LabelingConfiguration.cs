@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using JetBrains.Annotations;
+using Unity.Collections;
 using UnityEngine.Serialization;
 
 namespace UnityEngine.Perception.GroundTruth
@@ -13,6 +14,7 @@ namespace UnityEngine.Perception.GroundTruth
     [CreateAssetMenu(fileName = "LabelingConfiguration", menuName = "Perception/Labeling Configuration", order = 1)]
     public class LabelingConfiguration : ScriptableObject
     {
+
         [FormerlySerializedAs("LabelingConfigurations")]
         [FormerlySerializedAs("LabelEntries")]
         [SerializeField]
@@ -27,6 +29,8 @@ namespace UnityEngine.Perception.GroundTruth
         /// Whether the inspector will start label ids at zero or one when <see cref="AutoAssignIds"/> is enabled.
         /// </summary>
         public StartingLabelId StartingLabelId = StartingLabelId.One;
+
+        LabelEntryMatchCache m_LabelEntryMatchCache;
 
         /// <summary>
         /// A sequence of <see cref="LabelEntry"/> which defines the labels relevant for this configuration and their values.
@@ -76,6 +80,47 @@ namespace UnityEngine.Perception.GroundTruth
             labelEntryIndex = -1;
             labelEntry = default;
             return false;
+        }
+
+        /// <summary>
+        /// Initialize the list of LabelEntries on this LabelingConfiguration. Should only be called immediately after instantiation.
+        /// </summary>
+        /// <param name="labelEntries">The LabelEntry values to associate with this LabelingConfiguration</param>
+        /// <exception cref="InvalidOperationException">Thrown if <see cref="TryGetLabelEntryFromInstanceId"/> has ever been called on this object.</exception>
+        public void Init(IEnumerable<LabelEntry> labelEntries)
+        {
+            if (m_LabelEntryMatchCache != null)
+            {
+                throw new InvalidOperationException("LabelingConfiguration.Init() may not be called after TryGetLabelEntryFromInstanceId has been called for the first time.");
+            }
+
+            this.m_LabelEntries = new List<LabelEntry>(labelEntries);
+        }
+
+        /// <summary>
+        /// Attempts to find the label id for the given instance id.
+        /// </summary>
+        /// <param name="instanceId">The instanceId of the object for which the labelId should be found</param>
+        /// <param name="labelEntry">The LabelEntry associated with the object. default if not found</param>
+        /// <returns>True if a labelId is found for the given instanceId.</returns>
+        public bool TryGetLabelEntryFromInstanceId(uint instanceId, out LabelEntry labelEntry)
+        {
+            return TryGetLabelEntryFromInstanceId(instanceId, out labelEntry, out var _);
+        }
+
+        /// <summary>
+        /// Attempts to find the label id for the given instance id.
+        /// </summary>
+        /// <param name="instanceId">The instanceId of the object for which the labelId should be found</param>
+        /// <param name="labelEntry">The LabelEntry associated with the object. default if not found</param>
+        /// <param name="index">The index of the found LabelEntry in <see cref="LabelEntries"/>. -1 if not found</param>
+        /// <returns>True if a labelId is found for the given instanceId.</returns>
+        public bool TryGetLabelEntryFromInstanceId(uint instanceId, out LabelEntry labelEntry, out int index)
+        {
+            if (m_LabelEntryMatchCache == null)
+                m_LabelEntryMatchCache = new LabelEntryMatchCache(this);
+
+            return m_LabelEntryMatchCache.TryGetLabelEntryFromInstanceId(instanceId, out labelEntry, out index);
         }
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]

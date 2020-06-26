@@ -1,6 +1,5 @@
 #if URP_PRESENT
 using System;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -31,9 +30,9 @@ namespace UnityEngine.Perception.GroundTruth
     {
         SemanticSegmentationCrossPipelinePass m_SemanticSegmentationCrossPipelinePass;
 
-        public SemanticSegmentationUrpPass(Camera camera, RenderTexture targetTexture, LabelingConfiguration labelingConfiguration)
+        public SemanticSegmentationUrpPass(Camera camera, RenderTexture targetTexture, SemanticSegmentationLabelConfig labelConfig)
         {
-            m_SemanticSegmentationCrossPipelinePass = new SemanticSegmentationCrossPipelinePass(camera, labelingConfiguration);
+            m_SemanticSegmentationCrossPipelinePass = new SemanticSegmentationCrossPipelinePass(camera, labelConfig);
             ConfigureTarget(targetTexture, targetTexture.depthBuffer);
             m_SemanticSegmentationCrossPipelinePass.Setup();
         }

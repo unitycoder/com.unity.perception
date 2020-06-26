@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: SemanticSegmentationLabelingConfiguration
   m_EditorClassIdentifier: Unity.Perception.Runtime:UnityEngine.Perception.GroundTruth:SemanticSegmentationLabelConfig
   LabelEntries:
-  - label: box
+  - label: Box
     pixelValue: 10000
-  - label: cube
+  - label: Crate
     pixelValue: 20000
-  - label: crate
+  - label: Cube
     pixelValue: 30000
   AutoAssignIds: 1
   StartingLabelId: 1

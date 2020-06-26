@@ -13,7 +13,7 @@ namespace UnityEngine.Perception.GroundTruth
         const string k_ShaderName = "Perception/SemanticSegmentation";
         static readonly int k_LabelingId = Shader.PropertyToID("LabelingId");
 
-        LabelingConfiguration m_LabelingConfiguration;
+        SemanticSegmentationLabelConfig m_LabelConfig;
 
         //Serialize the shader so that the shader asset is included in player builds when the SemanticSegmentationPass is used.
         //Currently commented out and shaders moved to Resources folder due to serialization crashes when it is enabled.
@@ -22,9 +22,9 @@ namespace UnityEngine.Perception.GroundTruth
         Shader m_ClassLabelingShader;
         Material m_OverrideMaterial;
 
-        public SemanticSegmentationCrossPipelinePass(Camera targetCamera, LabelingConfiguration labelingConfiguration) : base(targetCamera)
+        public SemanticSegmentationCrossPipelinePass(Camera targetCamera, SemanticSegmentationLabelConfig labelConfig) : base(targetCamera)
         {
-            this.m_LabelingConfiguration = labelingConfiguration;
+            this.m_LabelConfig = labelConfig;
         }
 
         public override void Setup()
@@ -47,8 +47,8 @@ namespace UnityEngine.Perception.GroundTruth
 
         public override void SetupMaterialProperties(MaterialPropertyBlock mpb, Renderer renderer, Labeling labeling, uint instanceId)
         {
-            var entry = new LabelEntry();
-            foreach (var l in m_LabelingConfiguration.LabelEntries)
+            var entry = new SemanticSegmentationLabelEntry();
+            foreach (var l in m_LabelConfig.LabelEntries)
             {
                 if (labeling.labels.Contains(l.label))
                 {
@@ -58,7 +58,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             //Set the labeling ID so that it can be accessed in ClassSemanticSegmentationPass.shader
-            mpb.SetInt(k_LabelingId, entry.value);
+            mpb.SetInt(k_LabelingId, entry.pixelValue);
         }
     }
 }

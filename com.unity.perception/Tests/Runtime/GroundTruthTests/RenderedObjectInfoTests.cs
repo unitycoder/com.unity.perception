@@ -11,21 +11,19 @@ using UnityEngine.TestTools;
 namespace GroundTruthTests
 {
     [TestFixture]
-    public class BoundingBox2DTests : GroundTruthTestBase
+    public class RenderedObjectInfoTests : GroundTruthTestBase
     {
-        public class ProducesCorrectBoundingBoxesData
+        public class ProducesCorrectObjectInfoData
         {
-            public uint[] classCountsExpected;
-            public RenderedObjectInfo[] boundingBoxesExpected;
+            public RenderedObjectInfo[] renderedObjectInfosExpected;
             public uint[] data;
             public BoundingBoxOrigin boundingBoxOrigin;
             public int stride;
             public string name;
-            public ProducesCorrectBoundingBoxesData(uint[] data, RenderedObjectInfo[] boundingBoxesExpected, uint[] classCountsExpected, int stride, BoundingBoxOrigin boundingBoxOrigin, string name)
+            public ProducesCorrectObjectInfoData(uint[] data, RenderedObjectInfo[] renderedObjectInfosExpected, int stride, BoundingBoxOrigin boundingBoxOrigin, string name)
             {
                 this.data = data;
-                this.boundingBoxesExpected = boundingBoxesExpected;
-                this.classCountsExpected = classCountsExpected;
+                this.renderedObjectInfosExpected = renderedObjectInfosExpected;
                 this.stride = stride;
                 this.name = name;
                 this.boundingBoxOrigin = boundingBoxOrigin;
@@ -38,7 +36,7 @@ namespace GroundTruthTests
         }
         public static IEnumerable ProducesCorrectBoundingBoxesTestCases()
         {
-            yield return new ProducesCorrectBoundingBoxesData(
+            yield return new ProducesCorrectObjectInfoData(
                 new uint[]
                 {
                     1, 1,
@@ -49,18 +47,13 @@ namespace GroundTruthTests
                     {
                         boundingBox = new Rect(0, 0, 2, 2),
                         instanceId = 1,
-                        labelId = 1,
                         pixelCount = 4
                     }
-                }, new uint[]
-                {
-                    1,
-                    0
                 },
                 2,
                 BoundingBoxOrigin.BottomLeft,
                 "SimpleBox");
-            yield return new ProducesCorrectBoundingBoxesData(
+            yield return new ProducesCorrectObjectInfoData(
                 new uint[]
                 {
                     1, 0, 2,
@@ -71,25 +64,19 @@ namespace GroundTruthTests
                     {
                         boundingBox = new Rect(0, 0, 1, 2),
                         instanceId = 1,
-                        labelId = 1,
                         pixelCount = 2
                     },
                     new RenderedObjectInfo()
                     {
                         boundingBox = new Rect(2, 0, 1, 1),
                         instanceId = 2,
-                        labelId = 2,
                         pixelCount = 1
                     }
-                }, new uint[]
-                {
-                    1,
-                    1
                 },
                 3,
                 BoundingBoxOrigin.BottomLeft,
                 "WithGaps");
-            yield return new ProducesCorrectBoundingBoxesData(
+            yield return new ProducesCorrectObjectInfoData(
                 new uint[]
                 {
                     1, 2, 1,
@@ -100,25 +87,19 @@ namespace GroundTruthTests
                     {
                         boundingBox = new Rect(0, 0, 3, 2),
                         instanceId = 1,
-                        labelId = 1,
                         pixelCount = 4
                     },
                     new RenderedObjectInfo()
                     {
                         boundingBox = new Rect(1, 0, 1, 2),
                         instanceId = 2,
-                        labelId = 2,
                         pixelCount = 2
                     }
-                }, new uint[]
-                {
-                    1,
-                    1
                 },
                 3,
                 BoundingBoxOrigin.BottomLeft,
                 "Interleaved");
-            yield return new ProducesCorrectBoundingBoxesData(
+            yield return new ProducesCorrectObjectInfoData(
                 new uint[]
                 {
                     0, 0,
@@ -130,13 +111,8 @@ namespace GroundTruthTests
                     {
                         boundingBox = new Rect(1, 0, 1, 1),
                         instanceId = 1,
-                        labelId = 1,
                         pixelCount = 1
                     },
-                }, new uint[]
-                {
-                    1,
-                    0
                 },
                 2,
                 BoundingBoxOrigin.TopLeft,
@@ -144,13 +120,13 @@ namespace GroundTruthTests
         }
 
         [UnityTest]
-        public IEnumerator ProducesCorrectBoundingBoxes([ValueSource(nameof(ProducesCorrectBoundingBoxesTestCases))] ProducesCorrectBoundingBoxesData producesCorrectBoundingBoxesData)
+        public IEnumerator ProducesCorrectBoundingBoxes([ValueSource(nameof(ProducesCorrectBoundingBoxesTestCases))] ProducesCorrectObjectInfoData producesCorrectObjectInfoData)
         {
             var label = "label";
             var label2 = "label2";
             var labelingConfiguration = ScriptableObject.CreateInstance<LabelingConfiguration>();
 
-            labelingConfiguration.LabelEntries = new List<LabelEntry>
+            labelingConfiguration.Init(new List<LabelEntry>
             {
                 new LabelEntry
                 {
@@ -164,29 +140,23 @@ namespace GroundTruthTests
                     label = label2,
                     value = 500
                 }
-            };
+            });
 
-            var renderedObjectInfoGenerator = new RenderedObjectInfoGenerator(labelingConfiguration);
-            var groundTruthLabelSetupSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystem<GroundTruthLabelSetupSystem>();
-            groundTruthLabelSetupSystem.Activate(renderedObjectInfoGenerator);
+            var renderedObjectInfoGenerator = new RenderedObjectInfoGenerator();
 
             //Put a plane in front of the camera
             AddTestObjectForCleanup(TestHelper.CreateLabeledPlane(.1f, label));
             AddTestObjectForCleanup(TestHelper.CreateLabeledPlane(.1f, label2));
             yield return null;
 
-            var dataNativeArray = new NativeArray<uint>(producesCorrectBoundingBoxesData.data, Allocator.Persistent);
+            var dataNativeArray = new NativeArray<uint>(producesCorrectObjectInfoData.data, Allocator.Persistent);
 
-            renderedObjectInfoGenerator.Compute(dataNativeArray, producesCorrectBoundingBoxesData.stride, producesCorrectBoundingBoxesData.boundingBoxOrigin, out var boundingBoxes, out var classCounts, Allocator.Temp);
+            renderedObjectInfoGenerator.Compute(dataNativeArray, producesCorrectObjectInfoData.stride, producesCorrectObjectInfoData.boundingBoxOrigin, out var boundingBoxes, Allocator.Temp);
 
-            CollectionAssert.AreEqual(producesCorrectBoundingBoxesData.boundingBoxesExpected, boundingBoxes.ToArray());
-            CollectionAssert.AreEqual(producesCorrectBoundingBoxesData.classCountsExpected, classCounts.ToArray());
+            CollectionAssert.AreEqual(producesCorrectObjectInfoData.renderedObjectInfosExpected, boundingBoxes.ToArray());
 
             dataNativeArray.Dispose();
             boundingBoxes.Dispose();
-            classCounts.Dispose();
-            groundTruthLabelSetupSystem.Deactivate(renderedObjectInfoGenerator);
-            renderedObjectInfoGenerator.Dispose();
         }
     }
 }

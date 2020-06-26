@@ -33,9 +33,9 @@ namespace GroundTruthTests
               ""height"": {Screen.height / 2:F1}
             }}";
             var labelingConfiguration = CreateLabelingConfiguration();
-            SetupCamera(labelingConfiguration, pc =>
+            SetupCamera(pc =>
             {
-                pc.gameObject.AddComponent<BoundingBoxLabeler>();
+                pc.labelers.Add(new BoundingBox2DLabeler(labelingConfiguration));
             });
 
             var plane = TestHelper.CreateLabeledPlane();
@@ -53,11 +53,9 @@ namespace GroundTruthTests
         [UnityTest]
         public IEnumerator EnableSemanticSegmentation_GeneratesCorrectDataset()
         {
-            var labelingConfiguration = CreateLabelingConfiguration();
-            SetupCamera(labelingConfiguration, pc =>
+            SetupCamera(pc =>
             {
-                var semanticSegmentationLabeler = pc.gameObject.AddComponent<SemanticSegmentationLabeler>();
-                semanticSegmentationLabeler.labelingConfiguration = labelingConfiguration;
+                pc.labelers.Add(new SemanticSegmentationLabeler(CreateSemanticSegmentationLabelConfig()));
             });
 
             string expectedImageFilename = $"segmentation_{Time.frameCount}.png";
@@ -77,7 +75,7 @@ namespace GroundTruthTests
             var label = "label";
             var labelingConfiguration = ScriptableObject.CreateInstance<LabelingConfiguration>();
 
-            labelingConfiguration.LabelEntries = new List<LabelEntry>
+            labelingConfiguration.Init(new List<LabelEntry>
             {
                 new LabelEntry
                 {
@@ -85,11 +83,26 @@ namespace GroundTruthTests
                     label = label,
                     value = 500
                 }
+            });
+            return labelingConfiguration;
+        }
+        static SemanticSegmentationLabelConfig CreateSemanticSegmentationLabelConfig()
+        {
+            var label = "label";
+            var labelingConfiguration = ScriptableObject.CreateInstance<SemanticSegmentationLabelConfig>();
+
+            labelingConfiguration.LabelEntries = new List<SemanticSegmentationLabelEntry>
+            {
+                new SemanticSegmentationLabelEntry()
+                {
+                    label = label,
+                    pixelValue = 500
+                }
             };
             return labelingConfiguration;
         }
 
-        GameObject SetupCamera(LabelingConfiguration labelingConfiguration, Action<PerceptionCamera> initPerceptionCamera)
+        GameObject SetupCamera(Action<PerceptionCamera> initPerceptionCamera)
         {
             var cameraObject = new GameObject();
             cameraObject.SetActive(false);

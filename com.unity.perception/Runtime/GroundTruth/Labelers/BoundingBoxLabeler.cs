@@ -18,7 +18,6 @@ namespace UnityEngine.Perception.GroundTruth
         Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
         AnnotationDefinition m_BoundingBoxAnnotationDefinition;
         BoundingBoxValue[] m_BoundingBoxValues;
-        RenderedObjectInfoLabeler m_RenderedObjectInfoLabeler;
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]
         [SuppressMessage("ReSharper", "NotAccessedField.Local")]
@@ -26,24 +25,28 @@ namespace UnityEngine.Perception.GroundTruth
         {
             public int label_id;
             public string label_name;
-            public int instance_id;
+            public uint instance_id;
             public float x;
             public float y;
             public float width;
             public float height;
         }
 
+        public BoundingBox2DLabeler()
+        {
+        }
+
+        public BoundingBox2DLabeler(LabelingConfiguration labelConfig)
+        {
+            this.labelingConfiguration = labelConfig;
+        }
+
         public override void Setup()
         {
-            m_RenderedObjectInfoLabeler = (RenderedObjectInfoLabeler)PerceptionCamera.labelers.First(l => l is RenderedObjectInfoLabeler && ((RenderedObjectInfoLabeler)l).labelingConfiguration == labelingConfiguration);
-            if (m_RenderedObjectInfoLabeler == null)
-            {
-                PerceptionCamera.labelers
-            }
-            m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", m_RenderedObjectInfoLabeler.labelingConfiguration.GetAnnotationSpecification(),
+            m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", labelingConfiguration.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
 
-            m_RenderedObjectInfoLabeler.renderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
+            PerceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
         }
 
         public override void OnBeginRendering()
@@ -66,7 +69,7 @@ namespace UnityEngine.Perception.GroundTruth
                 for (var i = 0; i < renderedObjectInfos.Length; i++)
                 {
                     var objectInfo = renderedObjectInfos[i];
-                    if (!m_RenderedObjectInfoLabeler.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
+                    if (!labelingConfiguration.TryGetLabelEntryFromInstanceId(objectInfo.instanceId, out var labelEntry))
                         continue;
 
                     m_BoundingBoxValues[i] = new BoundingBoxValue
