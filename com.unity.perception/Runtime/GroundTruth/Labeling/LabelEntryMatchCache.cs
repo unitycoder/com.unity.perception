@@ -17,8 +17,8 @@ namespace UnityEngine.Perception.GroundTruth
         public LabelEntryMatchCache(LabelingConfiguration labelingConfiguration)
         {
             m_LabelingConfiguration = labelingConfiguration;
-            World.DefaultGameObjectInjectionWorld.GetOrCreateSystem<GroundTruthLabelSetupSystem>().Activate(this);
             m_InstanceIdToLabelEntryIndexLookup = new NativeList<ushort>(k_StartingObjectCount, Allocator.Persistent);
+            World.DefaultGameObjectInjectionWorld.GetOrCreateSystem<GroundTruthLabelSetupSystem>().Activate(this);
         }
 
         public bool TryGetLabelEntryFromInstanceId(uint instanceId, out LabelEntry labelEntry, out int index)

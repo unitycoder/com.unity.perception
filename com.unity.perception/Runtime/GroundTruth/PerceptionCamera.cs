@@ -108,6 +108,11 @@ namespace UnityEngine.Perception.GroundTruth
 
             SetupInstanceSegmentation();
 
+            foreach (var labeler in labelers)
+            {
+                labeler.Init(this);
+            }
+
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
         }
@@ -120,6 +125,9 @@ namespace UnityEngine.Perception.GroundTruth
 
             var cam = GetComponent<Camera>();
             cam.enabled = SensorHandle.ShouldCaptureThisFrame;
+
+            foreach (var labeler in labelers)
+                labeler.OnUpdate();
         }
 
         void CaptureRgbData(Camera cam)
@@ -200,7 +208,8 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnSimulationEnding()
         {
-            RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
+            foreach (var labeler in labelers)
+                labeler.OnSimulationEnding();
         }
 
         void OnBeginCameraRendering(ScriptableRenderContext _, Camera cam)
@@ -212,11 +221,15 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
 #endif
             CaptureRgbData(cam);
+
+            foreach (var labeler in labelers)
+                labeler.OnBeginRendering();
         }
 
         void OnDisable()
         {
             SimulationManager.SimulationEnding -= OnSimulationEnding;
+            RenderPipelineManager.beginCameraRendering -= OnBeginCameraRendering;
 
             OnSimulationEnding();
 

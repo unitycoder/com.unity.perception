@@ -25,13 +25,13 @@ namespace UnityEngine.Perception.GroundTruth {
         /// </summary>
         public SemanticSegmentationLabelConfig labelConfig;
 
-        public event Action<int,NativeArray<uint>,RenderTexture> SemanticSegmentationImageReadback;
+        public event Action<int,NativeArray<Color32>,RenderTexture> SemanticSegmentationImageReadback;
 
         [NonSerialized]
         internal RenderTexture semanticSegmentationTexture;
 
         AnnotationDefinition m_SemanticSegmentationAnnotationDefinition;
-        RenderTextureReader<uint> m_SemanticSegmentationTextureReader;
+        RenderTextureReader<Color32> m_SemanticSegmentationTextureReader;
 
 #if HDRP_PRESENT
         SemanticSegmentationPass m_SemanticSegmentationPass;
@@ -54,12 +54,12 @@ namespace UnityEngine.Perception.GroundTruth {
             [UsedImplicitly]
             public string label_name;
             [UsedImplicitly]
-            public int pixel_value;
+            public Color pixel_value;
         }
 
         struct AsyncSemanticSegmentationWrite
         {
-            public NativeArray<uint> data;
+            public NativeArray<Color32> data;
             public int width;
             public int height;
             public string path;
@@ -97,18 +97,18 @@ namespace UnityEngine.Perception.GroundTruth {
             var specs = labelConfig.LabelEntries.Select((l) => new SemanticSegmentationSpec()
             {
                 label_name = l.label,
-                pixel_value = l.pixelValue
+                pixel_value = l.color
             }).ToArray();
 
             m_SemanticSegmentationAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("semantic segmentation", specs, "pixel-wise semantic segmentation label", "PNG");
 
-            m_SemanticSegmentationTextureReader = new RenderTextureReader<uint>(semanticSegmentationTexture, myCamera,
+            m_SemanticSegmentationTextureReader = new RenderTextureReader<Color32>(semanticSegmentationTexture, myCamera,
                 (frameCount, data, tex) => OnSemanticSegmentationImageRead(frameCount, data));
 
             SimulationManager.SimulationEnding += OnSimulationEnding;
         }
 
-        void OnSemanticSegmentationImageRead(int frameCount, NativeArray<uint> data)
+        void OnSemanticSegmentationImageRead(int frameCount, NativeArray<Color32> data)
         {
             var dxLocalPath = Path.Combine(k_SemanticSegmentationDirectory, k_SegmentationFilePrefix) + frameCount + ".png";
             var path = Path.Combine(Manager.Instance.GetDirectoryFor(k_SemanticSegmentationDirectory), k_SegmentationFilePrefix) + frameCount + ".png";
@@ -122,7 +122,7 @@ namespace UnityEngine.Perception.GroundTruth {
             SemanticSegmentationImageReadback?.Invoke(frameCount, data, semanticSegmentationTexture);
             asyncRequest.data = new AsyncSemanticSegmentationWrite()
             {
-                data = new NativeArray<uint>(data, Allocator.TempJob),
+                data = new NativeArray<Color32>(data, Allocator.TempJob),
                 width = semanticSegmentationTexture.width,
                 height = semanticSegmentationTexture.height,
                 path = path

@@ -58,7 +58,7 @@ namespace UnityEngine.Perception.GroundTruth
             }
 
             //Set the labeling ID so that it can be accessed in ClassSemanticSegmentationPass.shader
-            mpb.SetInt(k_LabelingId, entry.pixelValue);
+            mpb.SetColor(k_LabelingId, entry.color);
         }
     }
 }

@@ -24,7 +24,7 @@ namespace UnityEngine.Perception.GroundTruth
     {
         string ILabelEntry.label => this.label;
         public string label;
-        public int pixelValue;
+        public Color color;
     }
     /// <summary>
     /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.

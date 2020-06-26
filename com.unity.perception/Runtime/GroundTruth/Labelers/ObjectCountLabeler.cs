@@ -50,6 +50,9 @@ namespace UnityEngine.Perception.GroundTruth
 
         public override void Setup()
         {
+            if (labelingConfiguration == null)
+                throw new InvalidOperationException("LabelingConfiguration must be supplied");
+
             PerceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
                 NativeArray<uint> objectCounts = ComputeObjectCounts(objectInfo);

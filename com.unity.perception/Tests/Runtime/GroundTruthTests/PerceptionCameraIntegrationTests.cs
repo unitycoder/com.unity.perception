@@ -96,7 +96,7 @@ namespace GroundTruthTests
                 new SemanticSegmentationLabelEntry()
                 {
                     label = label,
-                    pixelValue = 500
+                    color = Color.blue
                 }
             };
             return labelingConfiguration;

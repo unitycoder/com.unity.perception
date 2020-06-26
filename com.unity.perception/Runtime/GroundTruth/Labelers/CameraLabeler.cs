@@ -21,6 +21,7 @@ namespace UnityEngine.Perception.GroundTruth
         {
             PerceptionCamera = perceptionCamera;
             SensorHandle = perceptionCamera.SensorHandle;
+            Setup();
         }
     }
 }
