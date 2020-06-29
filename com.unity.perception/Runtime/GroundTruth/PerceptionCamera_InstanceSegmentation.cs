@@ -46,14 +46,14 @@ namespace UnityEngine.Perception.GroundTruth
             var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
             customPassVolume.injectionPoint = CustomPassInjectionPoint.BeforeRendering;
             customPassVolume.isGlobal = true;
-            m_SegmentationPass = new InstanceSegmentationPass()
+            m_InstanceSegmentationPass = new InstanceSegmentationPass()
             {
                 name = "Instance segmentation pass",
-                targetCamera = myCamera,
-                targetTexture = m_SegmentationTexture
+                targetCamera = GetComponent<Camera>(),
+                targetTexture = m_InstanceSegmentationTexture
             };
-            m_SegmentationPass.EnsureInit();
-            customPassVolume.customPasses.Add(m_SegmentationPass);
+            m_InstanceSegmentationPass.EnsureInit();
+            customPassVolume.customPasses.Add(m_InstanceSegmentationPass);
 #endif
 #if URP_PRESENT
             AddScriptableRenderPass(new InstanceSegmentationUrpPass(camera, m_InstanceSegmentationTexture));

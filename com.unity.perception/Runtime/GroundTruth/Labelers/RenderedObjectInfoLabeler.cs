@@ -31,7 +31,7 @@ namespace UnityEngine.Perception.GroundTruth
         // ReSharper restore InconsistentNaming
 
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
-        Dictionary<int, AsyncMetric> m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetric>();
+        Dictionary<int, AsyncMetric> m_ObjectInfoAsyncMetrics;
         MetricDefinition m_RenderedObjectInfoMetricDefinition;
 
         public RenderedObjectInfoLabeler()
@@ -51,7 +51,9 @@ namespace UnityEngine.Perception.GroundTruth
                 return;
             }
 
-            PerceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
+            m_ObjectInfoAsyncMetrics = new Dictionary<int, AsyncMetric>();
+
+            perceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
                 ProduceRenderedObjectInfoMetric(objectInfo, frameCount);
             };
@@ -68,7 +70,7 @@ namespace UnityEngine.Perception.GroundTruth
                     id: new Guid(objectInfoMetricId));
             }
 
-            m_ObjectInfoAsyncMetrics[Time.frameCount] = PerceptionCamera.SensorHandle.ReportMetricAsync(m_RenderedObjectInfoMetricDefinition);
+            m_ObjectInfoAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_RenderedObjectInfoMetricDefinition);
         }
 
         void ProduceRenderedObjectInfoMetric(NativeArray<RenderedObjectInfo> renderedObjectInfos, int frameCount)

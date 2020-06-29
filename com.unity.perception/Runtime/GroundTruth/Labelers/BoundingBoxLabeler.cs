@@ -15,7 +15,7 @@ namespace UnityEngine.Perception.GroundTruth
         static ProfilerMarker s_BoundingBoxCallback = new ProfilerMarker("OnBoundingBoxesReceived");
         public LabelingConfiguration labelingConfiguration;
 
-        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations;
         AnnotationDefinition m_BoundingBoxAnnotationDefinition;
         BoundingBoxValue[] m_BoundingBoxValues;
 
@@ -43,15 +43,20 @@ namespace UnityEngine.Perception.GroundTruth
 
         public override void Setup()
         {
+            if (labelingConfiguration == null)
+                throw new InvalidOperationException("LabelingConfiguration must be supplied");
+
+            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+
             m_BoundingBoxAnnotationDefinition = SimulationManager.RegisterAnnotationDefinition("bounding box", labelingConfiguration.GetAnnotationSpecification(),
                 "Bounding box for each labeled object visible to the sensor", id: new Guid(annotationId));
 
-            PerceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
+            perceptionCamera.RenderedObjectInfosCalculated += OnRenderedObjectInfosCalculated;
         }
 
         public override void OnBeginRendering()
         {
-            m_AsyncAnnotations[Time.frameCount] = PerceptionCamera.SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
+            m_AsyncAnnotations[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_BoundingBoxAnnotationDefinition);
         }
 
         void OnRenderedObjectInfosCalculated(int frameCount, NativeArray<RenderedObjectInfo> renderedObjectInfos)

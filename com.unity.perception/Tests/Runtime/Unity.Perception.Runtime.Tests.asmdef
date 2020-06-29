@@ -18,7 +18,8 @@
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll",
-        "Newtonsoft.Json.dll"
+        "Newtonsoft.Json.dll",
+        "Moq.dll"
     ],
     "autoReferenced": false,
     "defineConstraints": [
@@ -34,6 +35,11 @@
             "name": "com.unity.render-pipelines.high-definition",
             "expression": "",
             "define": "HDRP_PRESENT"
+        },
+        {
+            "name": "nuget.moq",
+            "expression": "",
+            "define": "MOQ_PRESENT"
         }
     ],
     "noEngineReferences": false

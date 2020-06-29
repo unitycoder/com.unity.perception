@@ -53,9 +53,8 @@ namespace UnityEngine.Perception.GroundTruth
         /// Event invoked after the camera finishes rendering during a frame.
         /// </summary>
 
-
         [SerializeReference]
-        public List<CameraLabeler> labelers = new List<CameraLabeler>();
+        List<CameraLabeler> m_Labelers = new List<CameraLabeler>();
         Dictionary<string, object> m_PersistentSensorData = new Dictionary<string, object>();
 
 #if URP_PRESENT
@@ -108,11 +107,6 @@ namespace UnityEngine.Perception.GroundTruth
 
             SetupInstanceSegmentation();
 
-            foreach (var labeler in labelers)
-            {
-                labeler.Init(this);
-            }
-
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
         }
@@ -126,8 +120,22 @@ namespace UnityEngine.Perception.GroundTruth
             var cam = GetComponent<Camera>();
             cam.enabled = SensorHandle.ShouldCaptureThisFrame;
 
-            foreach (var labeler in labelers)
+            foreach (var labeler in m_Labelers)
+            {
+                if (!labeler.enabled)
+                    continue;
+
+                if (!labeler.isInitialized)
+                    labeler.Init(this);
+
                 labeler.OnUpdate();
+            }
+        }
+
+        void OnValidate()
+        {
+            if (m_Labelers == null)
+                m_Labelers = new List<CameraLabeler>();
         }
 
         void CaptureRgbData(Camera cam)
@@ -208,8 +216,11 @@ namespace UnityEngine.Perception.GroundTruth
 
         void OnSimulationEnding()
         {
-            foreach (var labeler in labelers)
-                labeler.OnSimulationEnding();
+            foreach (var labeler in m_Labelers)
+            {
+                if (labeler.isInitialized)
+                    labeler.Cleanup();
+            }
         }
 
         void OnBeginCameraRendering(ScriptableRenderContext _, Camera cam)
@@ -222,8 +233,16 @@ namespace UnityEngine.Perception.GroundTruth
 #endif
             CaptureRgbData(cam);
 
-            foreach (var labeler in labelers)
+            foreach (var labeler in m_Labelers)
+            {
+                if (!labeler.enabled)
+                    continue;
+
+                if (!labeler.isInitialized)
+                    labeler.Init(this);
+
                 labeler.OnBeginRendering();
+            }
         }
 
         void OnDisable()
@@ -238,6 +257,21 @@ namespace UnityEngine.Perception.GroundTruth
 
             SensorHandle = default;
             CleanUpInstanceSegmentation();
+        }
+
+        public IReadOnlyList<CameraLabeler> labelers => m_Labelers;
+        public void AddLabeler(CameraLabeler cameraLabeler) => m_Labelers.Add(cameraLabeler);
+
+        public bool RemoveLabeler(CameraLabeler cameraLabeler)
+        {
+            if (m_Labelers.Remove(cameraLabeler))
+            {
+                if (cameraLabeler.isInitialized)
+                    cameraLabeler.Cleanup();
+
+                return true;
+            }
+            return false;
         }
     }
 }

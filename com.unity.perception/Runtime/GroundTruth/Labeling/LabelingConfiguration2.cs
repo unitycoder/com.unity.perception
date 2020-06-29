@@ -19,29 +19,6 @@ namespace UnityEngine.Perception.GroundTruth
     {
     }
 
-    [Serializable]
-    public struct SemanticSegmentationLabelEntry : ILabelEntry
-    {
-        string ILabelEntry.label => this.label;
-        public string label;
-        public Color color;
-    }
-    /// <summary>
-    /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.
-    /// </summary>
-    [CreateAssetMenu(fileName = "SemanticSegmentationLabelingConfiguration", menuName = "Perception/Semantic Segmentation Label Config", order = 1)]
-    public class SemanticSegmentationLabelConfig : LabelingConfiguration2<SemanticSegmentationLabelEntry>
-    {
-        /// <summary>
-        /// Whether the inspector will auto-assign ids based on the id of the first element.
-        /// </summary>
-        public bool AutoAssignIds = true;
-
-        /// <summary>
-        /// Whether the inspector will start label ids at zero or one when <see cref="AutoAssignIds"/> is enabled.
-        /// </summary>
-        public StartingLabelId StartingLabelId = StartingLabelId.One;
-    }
     /// <summary>
     /// A definition for how a <see cref="Labeling"/> should be resolved to a single label and id for ground truth generation.
     /// </summary>

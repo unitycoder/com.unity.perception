@@ -14,7 +14,6 @@ namespace UnityEngine.Perception.GroundTruth
     [CreateAssetMenu(fileName = "LabelingConfiguration", menuName = "Perception/Labeling Configuration", order = 1)]
     public class LabelingConfiguration : ScriptableObject
     {
-
         [FormerlySerializedAs("LabelingConfigurations")]
         [FormerlySerializedAs("LabelEntries")]
         [SerializeField]
@@ -121,6 +120,12 @@ namespace UnityEngine.Perception.GroundTruth
                 m_LabelEntryMatchCache = new LabelEntryMatchCache(this);
 
             return m_LabelEntryMatchCache.TryGetLabelEntryFromInstanceId(instanceId, out labelEntry, out index);
+        }
+
+        void OnDestroy()
+        {
+            m_LabelEntryMatchCache.Dispose();
+            m_LabelEntryMatchCache = null;
         }
 
         [SuppressMessage("ReSharper", "InconsistentNaming")]

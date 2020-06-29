@@ -8,20 +8,31 @@ namespace UnityEngine.Perception.GroundTruth
         public bool enabled;
         public bool foldout;
 
-        protected PerceptionCamera PerceptionCamera { get; private set; }
+        internal bool isInitialized { get; private set; }
+
+        protected PerceptionCamera perceptionCamera { get; private set; }
         protected SensorHandle SensorHandle { get; private set; }
 
-        public abstract void Setup();
+        public virtual void Setup() { }
         public virtual void OnUpdate() {}
         public virtual void OnBeginRendering() {}
 
-        public virtual void OnSimulationEnding() {}
+        public virtual void Cleanup() {}
 
         internal void Init(PerceptionCamera perceptionCamera)
         {
-            PerceptionCamera = perceptionCamera;
-            SensorHandle = perceptionCamera.SensorHandle;
-            Setup();
+            try
+            {
+                this.perceptionCamera = perceptionCamera;
+                SensorHandle = perceptionCamera.SensorHandle;
+                Setup();
+                isInitialized = true;
+            }
+            catch (Exception)
+            {
+                this.enabled = false;
+                throw;
+            }
         }
     }
 }

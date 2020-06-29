@@ -37,7 +37,7 @@ namespace UnityEngine.Perception.GroundTruth {
         SemanticSegmentationPass m_SemanticSegmentationPass;
 #endif
 
-        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+        Dictionary<int, AsyncAnnotation> m_AsyncAnnotations;
 
         public SemanticSegmentationLabeler()
         {
@@ -67,7 +67,7 @@ namespace UnityEngine.Perception.GroundTruth {
 
         public override void Setup()
         {
-            var myCamera = PerceptionCamera.GetComponent<Camera>();
+            var myCamera = perceptionCamera.GetComponent<Camera>();
             var width = myCamera.pixelWidth;
             var height = myCamera.pixelHeight;
 
@@ -77,21 +77,24 @@ namespace UnityEngine.Perception.GroundTruth {
                 this.enabled = false;
             }
 
+            m_AsyncAnnotations = new Dictionary<int, AsyncAnnotation>();
+
             semanticSegmentationTexture = new RenderTexture(new RenderTextureDescriptor(width, height, GraphicsFormat.R8G8B8A8_UNorm, 8));
             semanticSegmentationTexture.name = "Labeling";
 
 #if HDRP_PRESENT
-            var customPassVolume = this.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
+            var gameObject = perceptionCamera.gameObject;
+            var customPassVolume = gameObject.GetComponent<CustomPassVolume>() ?? gameObject.AddComponent<CustomPassVolume>();
             customPassVolume.injectionPoint = CustomPassInjectionPoint.BeforeRendering;
             customPassVolume.isGlobal = true;
-            m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, semanticSegmentationTexture, labelingConfiguration)
+            m_SemanticSegmentationPass = new SemanticSegmentationPass(myCamera, semanticSegmentationTexture, labelConfig)
             {
                 name = "Labeling Pass"
             };
             customPassVolume.customPasses.Add(m_SemanticSegmentationPass);
 #endif
 #if URP_PRESENT
-            PerceptionCamera.AddScriptableRenderPass(new SemanticSegmentationUrpPass(myCamera, semanticSegmentationTexture, labelConfig));
+            perceptionCamera.AddScriptableRenderPass(new SemanticSegmentationUrpPass(myCamera, semanticSegmentationTexture, labelConfig));
 #endif
 
             var specs = labelConfig.LabelEntries.Select((l) => new SemanticSegmentationSpec()
@@ -105,7 +108,7 @@ namespace UnityEngine.Perception.GroundTruth {
             m_SemanticSegmentationTextureReader = new RenderTextureReader<Color32>(semanticSegmentationTexture, myCamera,
                 (frameCount, data, tex) => OnSemanticSegmentationImageRead(frameCount, data));
 
-            SimulationManager.SimulationEnding += OnSimulationEnding;
+            SimulationManager.SimulationEnding += Cleanup;
         }
 
         void OnSemanticSegmentationImageRead(int frameCount, NativeArray<Color32> data)
@@ -144,10 +147,10 @@ namespace UnityEngine.Perception.GroundTruth {
 
         public override void OnBeginRendering()
         {
-            m_AsyncAnnotations[Time.frameCount] = PerceptionCamera.SensorHandle.ReportAnnotationAsync(m_SemanticSegmentationAnnotationDefinition);
+            m_AsyncAnnotations[Time.frameCount] = perceptionCamera.SensorHandle.ReportAnnotationAsync(m_SemanticSegmentationAnnotationDefinition);
         }
 
-        public override void OnSimulationEnding()
+        public override void Cleanup()
         {
             m_SemanticSegmentationTextureReader?.WaitForAllImages();
             m_SemanticSegmentationTextureReader?.Dispose();
@@ -156,7 +159,7 @@ namespace UnityEngine.Perception.GroundTruth {
 
         void OnDisable()
         {
-            SimulationManager.SimulationEnding -= OnSimulationEnding;
+            SimulationManager.SimulationEnding -= Cleanup;
 
             m_SemanticSegmentationTextureReader?.Dispose();
             m_SemanticSegmentationTextureReader = null;

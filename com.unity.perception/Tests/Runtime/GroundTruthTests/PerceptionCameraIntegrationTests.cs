@@ -6,6 +6,11 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Perception.GroundTruth;
 using UnityEngine.TestTools;
+using Object = UnityEngine.Object;
+
+#if MOQ_PRESENT
+using Moq;
+#endif
 
 namespace GroundTruthTests
 {
@@ -35,7 +40,7 @@ namespace GroundTruthTests
             var labelingConfiguration = CreateLabelingConfiguration();
             SetupCamera(pc =>
             {
-                pc.labelers.Add(new BoundingBox2DLabeler(labelingConfiguration));
+                pc.AddLabeler(new BoundingBox2DLabeler(labelingConfiguration));
             });
 
             var plane = TestHelper.CreateLabeledPlane();
@@ -55,7 +60,7 @@ namespace GroundTruthTests
         {
             SetupCamera(pc =>
             {
-                pc.labelers.Add(new SemanticSegmentationLabeler(CreateSemanticSegmentationLabelConfig()));
+                pc.AddLabeler(new SemanticSegmentationLabeler(CreateSemanticSegmentationLabelConfig()));
             });
 
             string expectedImageFilename = $"segmentation_{Time.frameCount}.png";
@@ -69,6 +74,88 @@ namespace GroundTruthTests
             var imagePath = Path.Combine("SemanticSegmentation", expectedImageFilename).Replace(@"\", @"\\");
             StringAssert.Contains(imagePath, capturesJson);
         }
+
+#if MOQ_PRESENT
+        [UnityTest]
+        public IEnumerator AddLabelerAfterStart_ShouldInitialize()
+        {
+            var camera = SetupCamera(null);
+            var mockLabeler = new Mock<CameraLabeler>();
+            yield return null;
+            camera.GetComponent<PerceptionCamera>().AddLabeler(mockLabeler.Object);
+            yield return null;
+            mockLabeler.Verify(l => l.Setup(), Times.Once());
+        }
+        [UnityTest]
+        public IEnumerator Labeler_ShouldSetupAndUpdateAndOnBeginRenderingInFirstFrame()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            SetupCamera(p => p.AddLabeler(mockLabeler.Object));
+            yield return null;
+            mockLabeler.Verify(l => l.Setup());
+            mockLabeler.Verify(l => l.OnUpdate());
+            mockLabeler.Verify(l => l.OnBeginRendering());
+        }
+        [UnityTest]
+        public IEnumerator AddAndRemoveLabelerInSameFrame_ShouldDoNothing()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            var cameraObject = SetupCamera(null);
+            var perceptionCamera = cameraObject.GetComponent<PerceptionCamera>();
+            perceptionCamera.AddLabeler(mockLabeler.Object);
+            perceptionCamera.RemoveLabeler(mockLabeler.Object);
+            yield return null;
+            mockLabeler.Verify(l => l.Setup(), Times.Never());
+            mockLabeler.Verify(l => l.OnUpdate(), Times.Never());
+            mockLabeler.Verify(l => l.OnBeginRendering(), Times.Never());
+            mockLabeler.Verify(l => l.Cleanup(), Times.Never());
+        }
+        [UnityTest]
+        public IEnumerator RemoveLabeler_ShouldCallCleanup()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            var cameraObject = SetupCamera(null);
+            var perceptionCamera = cameraObject.GetComponent<PerceptionCamera>();
+            perceptionCamera.AddLabeler(mockLabeler.Object);
+            yield return null;
+            Assert.IsTrue(perceptionCamera.RemoveLabeler(mockLabeler.Object));
+            mockLabeler.Verify(l => l.Cleanup(), Times.Once());
+        }
+        [UnityTest]
+        public IEnumerator RemoveLabeler_OnLabelerNotAdded_ShouldNotCallCleanup()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            var cameraObject = SetupCamera(null);
+            var perceptionCamera = cameraObject.GetComponent<PerceptionCamera>();
+            yield return null;
+            Assert.IsFalse(perceptionCamera.RemoveLabeler(mockLabeler.Object));
+            mockLabeler.Verify(l => l.Cleanup(), Times.Never());
+        }
+        [UnityTest]
+        public IEnumerator DestroyPerceptionCameraObject_ShouldCallCleanup()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            var cameraObject = SetupCamera(null);
+            var perceptionCamera = cameraObject.GetComponent<PerceptionCamera>();
+            perceptionCamera.AddLabeler(mockLabeler.Object);
+            yield return null;
+            Object.DestroyImmediate(cameraObject);
+            mockLabeler.Verify(l => l.Cleanup(), Times.Once());
+        }
+        [UnityTest]
+        public IEnumerator SetupThrows_ShouldDisable()
+        {
+            var mockLabeler = new Mock<CameraLabeler>();
+            mockLabeler.Setup(l => l.Setup()).Throws<InvalidOperationException>();
+            var labeler = mockLabeler.Object;
+            SetupCamera(p => p.AddLabeler(labeler));
+            yield return null;
+            mockLabeler.Verify(l => l.Setup(), Times.Once());
+            mockLabeler.Verify(l => l.OnUpdate(), Times.Never());
+            mockLabeler.Verify(l => l.OnBeginRendering(), Times.Never());
+            Assert.IsFalse(labeler.enabled);
+        }
+#endif
 
         static LabelingConfiguration CreateLabelingConfiguration()
         {
@@ -112,7 +199,7 @@ namespace GroundTruthTests
 
             var perceptionCamera = cameraObject.AddComponent<PerceptionCamera>();
             perceptionCamera.captureRgbImages = false;
-            initPerceptionCamera(perceptionCamera);
+            initPerceptionCamera?.Invoke(perceptionCamera);
 
             cameraObject.SetActive(true);
             AddTestObjectForCleanup(cameraObject);

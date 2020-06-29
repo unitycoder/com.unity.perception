@@ -28,7 +28,7 @@ namespace UnityEngine.Perception.GroundTruth
 
         ClassCountValue[] m_ClassCountValues;
 
-        Dictionary<int, AsyncMetric> m_ObjectCountAsyncMetrics = new Dictionary<int, AsyncMetric>();
+        Dictionary<int, AsyncMetric> m_ObjectCountAsyncMetrics;
         MetricDefinition m_ObjectCountMetricDefinition;
 
         public ObjectCountLabeler()
@@ -53,7 +53,9 @@ namespace UnityEngine.Perception.GroundTruth
             if (labelingConfiguration == null)
                 throw new InvalidOperationException("LabelingConfiguration must be supplied");
 
-            PerceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
+            m_ObjectCountAsyncMetrics =  new Dictionary<int, AsyncMetric>();
+
+            perceptionCamera.RenderedObjectInfosCalculated += (frameCount, objectInfo) =>
             {
                 NativeArray<uint> objectCounts = ComputeObjectCounts(objectInfo);
                 ObjectCountsComputed?.Invoke(frameCount, objectCounts, labelingConfiguration.LabelEntries);
@@ -69,7 +71,7 @@ namespace UnityEngine.Perception.GroundTruth
                     "Counts of objects for each label in the sensor's view", id: new Guid(objectCountMetricId));
             }
 
-            m_ObjectCountAsyncMetrics[Time.frameCount] = PerceptionCamera.SensorHandle.ReportMetricAsync(m_ObjectCountMetricDefinition);
+            m_ObjectCountAsyncMetrics[Time.frameCount] = perceptionCamera.SensorHandle.ReportMetricAsync(m_ObjectCountMetricDefinition);
         }
 
         NativeArray<uint> ComputeObjectCounts(NativeArray<RenderedObjectInfo> objectInfo)

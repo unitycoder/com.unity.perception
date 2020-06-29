@@ -114,7 +114,7 @@ namespace GroundTruthTests
             perceptionCamera.captureRgbImages = false;
             var classCountLabeler = new ObjectCountLabeler(labelingConfiguration);
             classCountLabeler.ObjectCountsComputed += onClassCountsReceived;
-            perceptionCamera.labelers.Add(classCountLabeler);
+            perceptionCamera.AddLabeler(classCountLabeler);
             cameraObject.SetActive(true);
 
             return cameraObject;

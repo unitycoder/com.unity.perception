@@ -214,7 +214,7 @@ namespace GroundTruthTests
             };
             var semanticSegmentationLabeler = new SemanticSegmentationLabeler(labelConfig);
             semanticSegmentationLabeler.SemanticSegmentationImageReadback += onSegmentationImageReceived;
-            perceptionCamera.labelers.Add(semanticSegmentationLabeler);
+            perceptionCamera.AddLabeler(semanticSegmentationLabeler);
             cameraObject.SetActive(true);
             return cameraObject;
         }

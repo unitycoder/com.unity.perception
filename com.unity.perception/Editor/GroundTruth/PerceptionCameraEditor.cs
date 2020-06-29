@@ -14,9 +14,10 @@ namespace UnityEditor.Perception.GroundTruth
     {
         ReorderableList m_LabelersList;
 
+        SerializedProperty labelersProperty => this.serializedObject.FindProperty("m_Labelers");
         public void OnEnable()
         {
-            m_LabelersList = new ReorderableList(this.serializedObject, this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers)), true, false, true, true);
+            m_LabelersList = new ReorderableList(this.serializedObject, labelersProperty, true, false, true, true);
             m_LabelersList.drawHeaderCallback = (rect) => {
                 EditorGUI.LabelField(rect, "Camera Labelers", EditorStyles.largeLabel);
             };
@@ -28,7 +29,7 @@ namespace UnityEditor.Perception.GroundTruth
 
         float GetElementHeight(int index)
         {
-            var serializedProperty = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers));
+            var serializedProperty = labelersProperty;
             var element = serializedProperty.GetArrayElementAtIndex(index);
             var editor = GetCameraLabelerDrawer(element, index);
             return editor.GetElementHeight(element);
@@ -38,7 +39,7 @@ namespace UnityEditor.Perception.GroundTruth
 
         void DrawElement(Rect rect, int index, bool isactive, bool isfocused)
         {
-            var element = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers)).GetArrayElementAtIndex(index);
+            var element = labelersProperty.GetArrayElementAtIndex(index);
             var editor = GetCameraLabelerDrawer(element, index);
             editor.OnGUI(rect, element);
         }
@@ -53,7 +54,7 @@ namespace UnityEditor.Perception.GroundTruth
         void OnAdd(ReorderableList list)
         {
             Undo.RegisterCompleteObjectUndo(target, "Remove camera labeler");
-            var labelers = this.serializedObject.FindProperty(nameof(PerceptionCamera.labelers));
+            var labelers = labelersProperty;
 
             var dropdownOptions = TypeCache.GetTypesDerivedFrom<CameraLabeler>();
             var menu = new GenericMenu();
@@ -80,6 +81,10 @@ namespace UnityEditor.Perception.GroundTruth
 
         public override void OnInspectorGUI()
         {
+            if (EditorSettings.asyncShaderCompilation)
+            {
+                EditorGUILayout.HelpBox("Asynchronous shader compilation is currently enabled.", MessageType.Warning);
+            }
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.description)));
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.period)));
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.startTime)));
@@ -87,8 +92,6 @@ namespace UnityEditor.Perception.GroundTruth
             //EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(PerceptionCamera.labelers)));
             m_LabelersList.DoLayoutList();
         }
-
-
 
         Dictionary<SerializedProperty, CameraLabelerDrawer> cameraLabelerDrawers = new Dictionary<SerializedProperty, CameraLabelerDrawer>();
         CameraLabelerDrawer GetCameraLabelerDrawer(SerializedProperty element, int listIndex)
