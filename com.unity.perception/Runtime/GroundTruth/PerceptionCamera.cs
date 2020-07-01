@@ -17,6 +17,7 @@ using UnityEngine.Serialization;
 #if HDRP_PRESENT
 using UnityEngine.Rendering.HighDefinition;
 #endif
+using UnityEngine.UI;
 
 namespace UnityEngine.Perception.GroundTruth
 {
@@ -65,6 +66,26 @@ namespace UnityEngine.Perception.GroundTruth
         /// Whether object bounding boxes should be computed
         /// </summary>
         public bool produceBoundingBoxAnnotations = true;
+        public bool visualizeBoundingBoxAnnotations = true;
+        public bool visualizeSegementationTextures = true;
+        // Transparency value for the visualization texture, value needs to be between 0 and 1
+        public float visualizeSegmentationTextureTransparency = 0.5f;
+
+        public float GetVisualizeSegmentationTextureTransparency()
+        {
+            return this.visualizeSegmentationTextureTransparency;
+        }
+
+        public void SetVisualizeSegmentationTextureTransparency(float visualizeSegmentationTextureTransparency)
+        {
+            this.visualizeSegmentationTextureTransparency = visualizeSegmentationTextureTransparency;
+            if (segmentationVisualizerGameObject != null)
+            {
+                var renderer = segmentationVisualizerGameObject.GetComponent<MeshRenderer>();
+                if (renderer != null) renderer.material.SetColor("_BaseColor", new Color(1,1,1,visualizeSegmentationTextureTransparency));
+            }
+        }
+        
         /// <summary>
         /// The ID to use for bounding box annotations in the resulting dataset
         /// </summary>
@@ -165,10 +186,6 @@ namespace UnityEngine.Perception.GroundTruth
             public float height;
         }
 
-        private GameObject boxQuad = null;
-        private GameObject cubeQuad = null;
-        private GameObject crateQuad = null;
-
         ClassCountValue[] m_ClassCountValues;
         BoundingBoxValue[] m_BoundingBoxValues;
         RenderedObjectInfoValue[] m_VisiblePixelsValues;
@@ -230,6 +247,32 @@ namespace UnityEngine.Perception.GroundTruth
             return m_PersistentSensorData.Remove(key);
         }
 
+        public void SetBoundsVisualizationEnabled(bool enable) 
+        {
+            if (boundsVisualizerHolder != null) boundsVisualizerHolder.SetActive(enable);
+            CaptureOptions.useAsyncReadbackIfSupported = !enable;
+        }
+
+        public void SetEnableSegmentationVisualization(bool enable)
+        {
+            visualizeSegementationTextures = enable;
+            if (segmentationVisualizerGameObject != null) segmentationVisualizerGameObject.SetActive(enable);
+        }
+
+        public bool IsSegmentationVisualizationEnabled()
+        {
+            return visualizeSegementationTextures;
+        }
+
+        private int frameCount = 0;
+
+        private Dictionary<string, MeshFilter> quadRenderCache = null;
+        private int visualizerLayerId = 0; 
+
+        private GameObject boundsVisualizerHolder = null;
+
+        private GameObject segmentationVisualizerGameObject = null;
+
         // Start is called before the first frame update
         void Awake()
         {
@@ -278,6 +321,11 @@ namespace UnityEngine.Perception.GroundTruth
             instanceSegmentationUrpPass = new InstanceSegmentationUrpPass(myCamera, segmentationTexture);
             semanticSegmentationUrpPass = new SemanticSegmentationUrpPass(myCamera, labelingTexture, LabelingConfiguration);
 #endif
+
+            if (visualizeBoundingBoxAnnotations)
+            {
+                CaptureOptions.useAsyncReadbackIfSupported = false;
+            }
 
             if (produceSegmentationImages)
             {
@@ -336,15 +384,22 @@ namespace UnityEngine.Perception.GroundTruth
 
                     if (produceRenderedObjectInfoMetric)
                         ProduceRenderedObjectInfoMetric(renderedObjectInfos, frameCount);
+
+                    // TODO not sure if this is the right place for this
+                    VisualizeSegmentationTexture(labelingTexture);
+
                 });
             }
 
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
             SimulationManager.SimulationEnding += OnSimulationEnding;
+            
+            visualizerLayerId = LayerMask.NameToLayer("Bounds");
 
-            boxQuad = GameObject.Find("BoxQuad");
-            cubeQuad = GameObject.Find("CubeQuad");
-            crateQuad = GameObject.Find("CrateQuad");
+            if (visualizeBoundingBoxAnnotations)
+            {
+                quadRenderCache = new Dictionary<string, MeshFilter>();
+            }
         }
 
         // ReSharper disable InconsistentNaming
@@ -406,6 +461,88 @@ namespace UnityEngine.Perception.GroundTruth
         }
 
 #endif
+        MeshFilter GetVisualizationQuad(string label)
+        {
+            if (boundsVisualizerHolder == null)
+            {
+                boundsVisualizerHolder = new GameObject("BoundsVisualizerHolder");
+            }
+
+            if (!quadRenderCache.ContainsKey(label))
+            {
+                var go = new GameObject(label + "Quad");
+                go.layer = visualizerLayerId;
+                var meshRenderer = go.AddComponent<MeshRenderer>();
+                var filter = go.AddComponent<MeshFilter>();
+                meshRenderer.material = Resources.Load<Material>("OutlineMaterial");
+                quadRenderCache[label] = filter;
+
+                go.transform.parent = boundsVisualizerHolder.transform;
+            }
+
+            return quadRenderCache[label];
+        }
+
+        void VisualizeSegmentationTexture(RenderTexture texture)
+        {
+            MeshRenderer mr = null;
+
+            if (segmentationVisualizerGameObject == null) 
+            {
+                segmentationVisualizerGameObject = new GameObject("SegmentationTextureRenderer");
+                segmentationVisualizerGameObject.layer = visualizerLayerId;
+                
+                var mf = segmentationVisualizerGameObject.AddComponent<MeshFilter>();
+                mr = segmentationVisualizerGameObject.AddComponent<MeshRenderer>();
+                mr.material = Resources.Load<Material>("SegmentationMaterial");
+                
+                var cam = GetComponent<Camera>();
+                var ll = cam.ScreenToWorldPoint(new Vector3(0, 0, 10));
+                var ul = cam.ScreenToWorldPoint(new Vector3(0, cam.pixelHeight, 10));
+                var ur = cam.ScreenToWorldPoint(new Vector3(cam.pixelWidth, cam.pixelHeight, 10));
+                var lr = cam.ScreenToWorldPoint(new Vector3(cam.pixelWidth, 0, 10));
+
+                // Set up the mesh to project the segmentation render texture on
+                mf.mesh.vertices = new Vector3[] { ll, ul, ur, lr };
+                mf.mesh.triangles = new int[] { 0, 1, 2, 0, 2, 3 };
+                mf.mesh.uv = new Vector2[] { Vector2.zero, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
+
+                if (mr != null) 
+                {
+                    mr.material.SetColor("_BaseColor", new Color(1,1,1,visualizeSegmentationTextureTransparency));
+                    mr.material.SetTexture("_BaseMap", texture);
+                }
+            }
+        }
+
+        void VisualizeBoundingBoxes(BoundingBoxValue[] inBoxes)
+        {
+            if (!visualizeBoundingBoxAnnotations) return;
+
+            foreach (var box in inBoxes)
+            {
+                var filter = GetVisualizationQuad(box.label_name);
+
+                var cam = GetComponent<Camera>();
+                var height = cam.pixelHeight * 0.5f;
+                var y = height + (height - box.y);
+
+                Vector3 ll = cam.ScreenToWorldPoint(new Vector3(box.x, y, 1));
+                Vector3 ul = cam.ScreenToWorldPoint(new Vector3(box.x, y - box.height, 1));
+                Vector3 ur = cam.ScreenToWorldPoint(new Vector3(box.x + box.width, y - box.height, 1));
+                Vector3 lr = cam.ScreenToWorldPoint(new Vector3(box.x + box.width, y, 1));
+                    
+                Vector3[] verts = new Vector3[4] {ll, ul, ur, lr};
+                int[] tris = new int[6] {0, 2, 1, 0, 3, 2};
+                Vector2[] uvs = new Vector2[4] {Vector2.zero, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
+
+                Mesh mesh = new Mesh();
+                mesh.vertices = verts;
+                mesh.triangles = tris;
+                mesh.uv = uvs;
+                filter.mesh = mesh;
+            }
+        }
 
         void ProduceBoundingBoxesAnnotation(NativeArray<RenderedObjectInfo> renderedObjectInfos, List<LabelEntry> labelingConfigurations, int frameCount)
         {
@@ -438,35 +575,11 @@ namespace UnityEngine.Perception.GroundTruth
                         width = objectInfo.boundingBox.width,
                         height = objectInfo.boundingBox.height,
                     };
-
-                    GameObject active = crateQuad;
-                    if (labelEntry.label == "Box") active = boxQuad;
-                    else if (labelEntry.label == "Cube") active = cubeQuad;
-
-                    var cam = GetComponent<Camera>();
-                    var height = cam.pixelHeight;
-
-                    var halfHeight = height * 0.5f;
-
-                    var y = halfHeight + (halfHeight - objectInfo.boundingBox.y);
-
-                    Vector3 ll = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x, y, 1));
-                    Vector3 ul = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x, y - objectInfo.boundingBox.height, 1));
-                    Vector3 ur = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x + objectInfo.boundingBox.width, y - objectInfo.boundingBox.height, 1));
-                    Vector3 lr = cam.ScreenToWorldPoint(new Vector3(objectInfo.boundingBox.x + objectInfo.boundingBox.width, y, 1));
-                        
-                    Vector3[] verts = new Vector3[4] {ll, ul, ur, lr};
-                    int[] tris = new int[6] {0, 2, 1, 0, 3, 2};
-                    Vector2[] uvs = new Vector2[4] {Vector2.zero, new Vector2(0, 1), new Vector2(1, 1), new Vector2(1, 0) };
-
-                    var filter = active.GetComponent<MeshFilter>();
-                    Mesh mesh = new Mesh();
-                    mesh.vertices = verts;
-                    mesh.triangles = tris;
-                    mesh.uv = uvs;
-                    filter.mesh = mesh;
                 }
 
+                // TODO I'm not sure that I'm calling this from the right place
+                VisualizeBoundingBoxes(m_BoundingBoxValues);
+                
                 boundingBoxAsyncAnnotation.ReportValues(m_BoundingBoxValues);
             }
         }
@@ -709,6 +822,7 @@ namespace UnityEngine.Perception.GroundTruth
 
             var dxLocalPath = Path.Combine(k_SemanticSegmentationDirectory, k_SegmentationFilePrefix) + frameCount + ".png";
             var path = Path.Combine(Manager.Instance.GetDirectoryFor(k_SemanticSegmentationDirectory), k_SegmentationFilePrefix) + frameCount + ".png";
+            
             var annotation = asyncCaptureInfo.SegmentationAsyncAnnotation;
             if (!annotation.IsValid)
                 return;

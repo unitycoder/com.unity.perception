@@ -24,3 +24,12 @@ MonoBehaviour:
   - id: 3
     label: Crate
     value: 30000
+  - id: 4
+    label: BoxMookie
+    value: 4000
+  - id: 5
+    label: BoxKeith
+    value: 5000
+  - id: 6
+    label: BoxGooden
+    value: 6000

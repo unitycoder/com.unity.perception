@@ -34,9 +34,6 @@ namespace UnityEngine.Perception.GroundTruth
             this.m_CameraRenderingToSource = cameraRenderingToSource;
             m_NextFrameToCapture = Time.frameCount;
 
-            // TODO find a better place for this but hardcoded right now to make progress
-            CaptureOptions.useAsyncReadbackIfSupported = false;
-
             if (!GraphicsUtilities.SupportsAsyncReadback())
                 m_CpuTexture = new Texture2D(m_Source.width, m_Source.height, m_Source.graphicsFormat, TextureCreationFlags.None);
 
