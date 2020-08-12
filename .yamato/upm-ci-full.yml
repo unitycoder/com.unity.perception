@@ -19,7 +19,7 @@ pack:
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
 pkg_test_{{ platform.name }}_{{ editor.version }}:
-  name : Package tests, {{ editor.version }}, {{ platform.name }})
+  name : Package tests, {{ editor.version }}, {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}

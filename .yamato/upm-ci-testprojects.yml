@@ -50,7 +50,7 @@ codecoverage_windows_{{suite.name}}_{{editor.version}}:
         - "test-results/**/*"
         - "TestProjects/PerceptionHDRP/test-results/**/*"
   dependencies:
-    - .yamato/upm-ci-full.yml#pack_Perception
+    - .yamato/upm-ci-full.yml#pack
 {% endfor %}
 {% endfor %}
 

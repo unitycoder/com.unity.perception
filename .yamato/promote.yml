@@ -4,7 +4,7 @@
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
 promotion_test_{{ platform.name }}_{{ editor.version }}:
-  name : Promotion tests, {{ editor.version }}, {{ platform.name }})
+  name : Promotion tests, {{ editor.version }}, {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}
