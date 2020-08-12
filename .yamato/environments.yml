@@ -1,30 +1,16 @@
-
 upmci_registry: https://artifactory.prd.cds.internal.unity3d.com/artifactory/api/npm/upm-npm
 
 test_editors:
   - version: 2019.3.15f1
-
-publish_editors:
+  - version: 2020.1.1f1
+  - version: trunk
+  
+commit_hook_editors:
   - version: 2019.3.15f1
-
-publish_platforms:
-  - name: win
-    type: Unity::VM
-    image: package-ci/win10:stable
-    flavor: b1.large
-    extra-args: --force-d3d11
-    standalone-platform: StandaloneWindows64
-  - name: mac
-    type: Unity::VM::osx
-    image: package-ci/mac:stable
-    flavor: m1.mac
-    extra-args: --force-metal
-    standalone-platform: StandaloneOSX
-  - name: ubuntu
-    type: Unity::VM
-    image: package-ci/ubuntu:latest
-    flavor: b1.large
-
+  - version: 2020.1.1f1
+  
+nightly_editors:
+  - version: trunk
 
 test_platforms:
   - name: win
@@ -51,9 +37,6 @@ suites:
   - name: editmode
     display_name: editmode
     args: --suite=playmode --suite=editor --platform=Editor
-
-package_variants:
-  - name: Perception
 
 projects:
   - name: PerceptionHDRP

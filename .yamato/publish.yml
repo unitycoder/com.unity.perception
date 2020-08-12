@@ -20,15 +20,5 @@ publish:
       paths:
         - "upm-ci~/packages/*.tgz"
   dependencies:
-    - .yamato/upm-ci-full.yml#pack_Perception
-    {% for editor in publish_editors %}
-    {% for platform in publish_platforms %}
-    {% for suite in suites %}
-    {% for project in projects %}
-    - .yamato/upm-ci-full.yml#pkg_test_Perception_{{platform.name}}_{{editor.version}}
-    - .yamato/upm-ci-testprojects.yml#{{project.name}}_windows_{{suite.name}}_{{editor.version}}
-    {% endfor %}
-    {% endfor %}
-    {% endfor %}
-    {% endfor %}
+    - .yamato/upm-ci-full.yml#test_trigger
 
