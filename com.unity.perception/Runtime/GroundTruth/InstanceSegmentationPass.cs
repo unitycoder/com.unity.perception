@@ -22,10 +22,11 @@ namespace UnityEngine.Perception.GroundTruth
         public InstanceSegmentationPass()
         {}
 
-        protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        //protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        protected override void Execute(CustomPassContext customPassContext)
         {
-            CoreUtils.SetRenderTarget(cmd, targetTexture, ClearFlag.All);
-            m_InstanceSegmentationCrossPipelinePass.Execute(renderContext, cmd, hdCamera.camera, cullingResult);
+            CoreUtils.SetRenderTarget(customPassContext.cmd, targetTexture, ClearFlag.All);
+            m_InstanceSegmentationCrossPipelinePass.Execute(customPassContext.renderContext, customPassContext.cmd, customPassContext.hdCamera.camera, customPassContext.cullingResults);
         }
 
         public void EnsureInit()

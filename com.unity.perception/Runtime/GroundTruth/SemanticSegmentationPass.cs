@@ -45,10 +45,11 @@ namespace UnityEngine.Perception.GroundTruth
             m_SemanticSegmentationCrossPipelinePass.Setup();
         }
 
-        protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        //protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        protected override void Execute(CustomPassContext customPassContext)
         {
-            CoreUtils.SetRenderTarget(cmd, targetTexture);
-            m_SemanticSegmentationCrossPipelinePass.Execute(renderContext, cmd, hdCamera.camera, cullingResult);
+            CoreUtils.SetRenderTarget(customPassContext.cmd, targetTexture);
+            m_SemanticSegmentationCrossPipelinePass.Execute(customPassContext.renderContext, customPassContext.cmd, customPassContext.hdCamera.camera, customPassContext.cullingResults);
         }
     }
 }

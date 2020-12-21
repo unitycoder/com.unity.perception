@@ -168,7 +168,11 @@ namespace UnityEngine.Perception.Randomization.Editor
             {
                 scenes = new[] { AssetDatabase.GetAssetPath(m_MainSceneField.value) },
                 locationPathName = Path.Combine(projectBuildDirectory, $"{m_RunNameField.value}.x86_64"),
+#if USE_CLOUD_RENDERING
+                target = BuildTarget.CloudRendering
+#else
                 target = BuildTarget.StandaloneLinux64
+#endif
             };
             var report = BuildPipeline.BuildPlayer(buildPlayerOptions);
             var summary = report.summary;

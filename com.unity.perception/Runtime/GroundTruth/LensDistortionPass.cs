@@ -44,10 +44,11 @@ namespace UnityEngine.Perception.GroundTruth
             m_LensDistortionCrossPipelinePass.Setup();
         }
 
-        protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        //protected override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        protected override void Execute(CustomPassContext customPassContext)
         {
-            CoreUtils.SetRenderTarget(cmd, targetTexture);
-            m_LensDistortionCrossPipelinePass.Execute(renderContext, cmd, hdCamera.camera, cullingResult);
+            CoreUtils.SetRenderTarget(customPassContext.cmd, targetTexture);
+            m_LensDistortionCrossPipelinePass.Execute(customPassContext.renderContext, customPassContext.cmd, customPassContext.hdCamera.camera, customPassContext.cullingResults);
         }
     }
 }

@@ -31,13 +31,14 @@ namespace UnityEngine.Perception.GroundTruth
             this.targetDepthBuffer = TargetBuffer.Custom;
         }
 
-        protected sealed override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        //protected sealed override void Execute(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult)
+        protected sealed override void Execute(CustomPassContext customPassContext)
         {
             // CustomPasses are executed for each camera. We only want to run for the target camera
-            if (hdCamera.camera != targetCamera)
+            if (customPassContext.hdCamera.camera != targetCamera)
                 return;
 
-            ExecutePass(renderContext, cmd, hdCamera, cullingResult);
+            ExecutePass(customPassContext.renderContext, customPassContext.cmd, customPassContext.hdCamera, customPassContext.cullingResults);
         }
 
         protected abstract void ExecutePass(ScriptableRenderContext renderContext, CommandBuffer cmd, HDCamera hdCamera, CullingResults cullingResult);
