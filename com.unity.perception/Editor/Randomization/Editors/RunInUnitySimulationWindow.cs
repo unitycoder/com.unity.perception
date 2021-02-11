@@ -146,7 +146,10 @@ namespace UnityEditor.Perception.Randomization
             {
                 ValidateSettings();
                 CreateLinuxBuildAndZip();
-                await StartUnitySimulationRun(runGuid);
+
+                await UploadAsDsaasTemplate();
+
+                //await StartUnitySimulationRun(runGuid);
             }
             catch (Exception e)
             {
@@ -155,6 +158,7 @@ namespace UnityEditor.Perception.Randomization
                 throw;
             }
         }
+
 
         void ValidateSettings()
         {
