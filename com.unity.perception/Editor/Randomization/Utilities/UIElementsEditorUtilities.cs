@@ -9,7 +9,7 @@ namespace UnityEditor.Perception.Randomization
     /// <summary>
     /// This class contains a set of helper functions for simplifying the creation of UI Elements editors
     /// </summary>
-    public static class UIElementsEditorUtilities
+    static class UIElementsEditorUtilities
     {
         /// <summary>
         /// Creates a list of PropertyFields from the class fields of the given SerializedObject

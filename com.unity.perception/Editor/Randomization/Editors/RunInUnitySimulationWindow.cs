@@ -1,8 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Management.Instrumentation;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Mime;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Unity.Simulation.Client;
@@ -18,6 +24,8 @@ namespace UnityEditor.Perception.Randomization
 {
     class RunInUnitySimulationWindow : EditorWindow
     {
+        readonly HttpClient m_HttpClient = new HttpClient();
+
         string m_BuildDirectory;
 
         string m_BuildZipPath;
@@ -29,6 +37,14 @@ namespace UnityEditor.Perception.Randomization
         ObjectField m_ScenarioField;
         SysParamDefinition m_SysParam;
         IntegerField m_TotalIterationsField;
+
+        #region DSaaS
+
+        TextField m_AuthTokenField;
+
+
+        #endregion
+
 
         [MenuItem("Window/Run in Unity Simulation")]
         static void ShowWindow()
@@ -132,6 +148,17 @@ namespace UnityEditor.Perception.Randomization
 
             m_RunButton = root.Q<Button>("run-button");
             m_RunButton.clicked += RunInUnitySimulation;
+
+            #region DSaaS
+
+            m_AuthTokenField = root.Q<TextField>("auth-token");
+            var token = PlayerPrefs.GetString("latestDsaasAuthToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                m_AuthTokenField.value = token;
+            }
+
+            #endregion
         }
 
         async void RunInUnitySimulation()
@@ -145,20 +172,148 @@ namespace UnityEditor.Perception.Randomization
             try
             {
                 ValidateSettings();
-                CreateLinuxBuildAndZip();
+                //CreateLinuxBuildAndZip();
 
-                await UploadAsDsaasTemplate();
+                //await UploadAsDsaasTemplate();
+                //await DsaasRefreshTemplates();
+                await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
 
                 //await StartUnitySimulationRun(runGuid);
             }
             catch (Exception e)
             {
                 EditorUtility.ClearProgressBar();
-                PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
+                //PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
                 throw;
             }
         }
 
+        #region DSaaS
+
+
+        string m_AuthToken;
+        string orgID = "20066313632537";
+        string stgUrl = "https://perception-api.stg.simulation.unity3d.com";
+        string templateId = "cdd55c7b-ba28-4fc2-be79-0f5822fcca46";
+        string templateVersionId = "f2e4afb7-9878-46e9-a4be-929753b1ce26";
+        bool useProjectAccessToken = false;
+
+        List<DsaasTempLate> dsaasTemplates = new List<DsaasTempLate>();
+
+        void SetDsaasEnvVars()
+        {
+            m_AuthToken = m_AuthTokenField.value;
+            if (!string.IsNullOrEmpty(m_AuthToken))
+            {
+                PlayerPrefs.SetString("latestDsaasAuthToken", m_AuthToken);
+            }
+        }
+
+        struct DsaasTempLate
+        {
+            public string title;
+            public string description;
+            public string id;
+            [JsonProperty("public")]
+            public bool isPublic;
+            public string imgSrc;
+            public string moreInfo;
+        }
+
+        class DsaasCreateTemplateRequest
+        {
+            public string title;
+            public string description;
+            [JsonProperty("public")]
+            public bool isPublic;
+        }
+
+        async Task UploadBuildToDsaasTemplate()
+        {
+            SetDsaasEnvVars();
+            m_HttpClient.DefaultRequestHeaders.Clear();
+            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", useProjectAccessToken? Project.accessToken : m_AuthToken);
+
+            var requestUri = new Uri($"{stgUrl}/v1/organizations/{orgID}/templates/{templateId}/versions/{templateVersionId}:uploadUrl");
+            HttpContent requestContents = new StringContent("\"filename\": \"m_test_template_1.zip\"", Encoding.Unicode, "application/json");
+            try
+            {
+                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
+                HttpContent responseContents = httpResponse.Content;
+            }
+            catch (HttpRequestException e)
+            {
+            }
+        }
+
+        async Task DsaasRefreshTemplates()
+        {
+            SetDsaasEnvVars();
+            m_HttpClient.DefaultRequestHeaders.Clear();
+            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", useProjectAccessToken? Project.accessToken : m_AuthToken);
+
+            var requestUri = new Uri($"{stgUrl}/v1/organizations/{orgID}/templates/");
+
+            try
+            {
+                HttpResponseMessage httpResponse = await m_HttpClient.GetAsync(requestUri);
+                if (httpResponse.IsSuccessStatusCode)
+                {
+                    dsaasTemplates.Clear();
+                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
+                    var responseJson = JObject.Parse(responseString);
+                    dsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTempLate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
+                }
+            }
+            catch (HttpRequestException e)
+            {
+            }
+        }
+
+        async Task DsaasCreateTemplate(string templateTitle, string templateDescription, bool isTemplatePublic)
+        {
+            m_HttpClient.DefaultRequestHeaders.Clear();
+            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", useProjectAccessToken? Project.accessToken : m_AuthToken);
+
+            var requestUri = new Uri($"{stgUrl}/v1/organizations/{orgID}/templates/");
+
+            var request = new DsaasCreateTemplateRequest
+            {
+                title = templateTitle,
+                description = templateDescription,
+                isPublic = isTemplatePublic
+            };
+
+            var tmp = JsonConvert.SerializeObject(request);
+            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.Unicode, "application/json");
+
+            try
+            {
+                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
+                if (httpResponse.IsSuccessStatusCode)
+                {
+                    dsaasTemplates.Clear();
+                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
+                    var responseJson = JObject.Parse(responseString);
+                    dsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTempLate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
+                }
+            }
+            catch (HttpRequestException e)
+            {
+            }
+        }
+
+        async Task DsaasCreateTemplateVersion(string templateId)
+        {
+
+        }
+
+        async Task GetDsaasUploadUrl()
+        {
+
+        }
+
+        #endregion
 
         void ValidateSettings()
         {
