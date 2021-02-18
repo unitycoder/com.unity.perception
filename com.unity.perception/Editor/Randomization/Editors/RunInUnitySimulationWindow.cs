@@ -180,12 +180,12 @@ namespace UnityEditor.Perception.Randomization
                 //await DsaasRefreshTemplates();
                 //await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
                 //await DsaasRefreshTemplateVersions(m_TemplateId);
-                // await DsaasCreateNewTemplateVersion(m_TemplateId, true, new List<KeyValuePair<string, string>>
-                // {
-                //     new KeyValuePair<string, string>("testK3","testV3"),
-                //     new KeyValuePair<string, string>("testK23","testV23")
-                // });
-                await UploadBuildToDsaasTemplateVersion(m_TemplateId, m_TemplateVersionId);
+                await DsaasCreateNewTemplateVersion(m_TemplateId, true, new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("testK3","testV3"),
+                    new KeyValuePair<string, string>("testK23","testV23")
+                });
+                //await UploadBuildToDsaasTemplateVersion(m_TemplateId, m_TemplateVersionId);
 
                 //await StartUnitySimulationRun(runGuid);
             }
@@ -261,6 +261,7 @@ namespace UnityEditor.Perception.Randomization
             public string authorId;
             [CanBeNull]
             public List<KeyValuePair<string, string>> tags;
+            public string randomizers;
         }
 
         struct DsaasGenerateUploadUrlRequest
@@ -403,7 +404,8 @@ namespace UnityEditor.Perception.Randomization
                 published = published,
                 version = newVersionString,
                 tags = tags,
-                authorId = m_OrgID
+                authorId = m_OrgID,
+                randomizers = JObject.Parse(currentScenario.SerializeToJson()).GetValue("randomizers").ToString()
             };
 
             HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
@@ -423,7 +425,10 @@ namespace UnityEditor.Perception.Randomization
 
         async Task UploadBuildToDsaasTemplateVersion(string templateId, string templateVersionId)
         {
-            CreateLinuxBuildAndZip();
+            //CreateLinuxBuildAndZip();
+
+            var projectBuildDirectory = $"{m_BuildDirectory}/{m_RunNameField.value}";
+            m_BuildZipPath = projectBuildDirectory + ".zip";
 
             m_HttpClient.DefaultRequestHeaders.Clear();
             m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
@@ -447,6 +452,7 @@ namespace UnityEditor.Perception.Randomization
                     var responseString = httpResponse.Content.ReadAsStringAsync().Result;
                     var responseJson = JObject.Parse(responseString);
                     uploadUrl = responseJson.GetValue("url").ToString();
+                    Debug.Log("expires: " + responseJson.GetValue("expires"));
                 }
             }
             catch (HttpRequestException e)
@@ -457,7 +463,12 @@ namespace UnityEditor.Perception.Randomization
             {
                 var stream = File.OpenRead(m_BuildZipPath);
                 requestContents = new StreamContent(stream);
+                requestContents.Headers.Add("Content-Type", "application/zip");
                 HttpResponseMessage httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
+
+                Debug.Log(httpResponse.StatusCode);
+                Debug.Log(httpResponse.Headers);
+                Debug.Log(httpResponse.Content);
             }
         }
 
