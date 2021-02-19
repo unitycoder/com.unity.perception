@@ -33,27 +33,23 @@ namespace UnityEditor.Perception.Randomization
         SysParamDefinition[] m_SysParamDefinitions;
         IntegerField m_InstanceCountField;
         TextField m_BuildNameField;
-        IntegerField m_TotalIterationsField;
-        ToolbarMenu m_SysParamMenu;
-        int m_SysParamIndex;
         ObjectField m_ScenarioConfigField;
-        Button m_RunButton;
-        Label m_PrevRunNameLabel;
+        Button m_UploadButton;
+
         Label m_ProjectIdLabel;
-        Label m_PrevExecutionIdLabel;
+
+        ListView m_DsaasTemplatesListView;
+        ListView m_DsaasSelectedTemplateVersionsListView;
+        Label m_DsaasSelectedTemplateIdLabel;
+
         BuildParameters m_BuildParameters;
 
-        #region DSaaS
-
         TextField m_AuthTokenField;
-
-        #endregion
-
 
         [MenuItem("Window/Upload to DSaaS...")]
         static void ShowWindow()
         {
-            var window = GetWindow<RunInUnitySimulationWindow>();
+            var window = GetWindow<DsaasWindow>();
             window.titleContent = new GUIContent("DSaaS");
             window.minSize = new Vector2(250, 50);
             window.Show();
@@ -95,18 +91,18 @@ namespace UnityEditor.Perception.Randomization
             }
             else
             {
-                CreateDsaasUI();
+                CreateDsaasWindowUI();
             }
         }
 
-        void CreateDsaasUI()
+        void CreateDsaasWindowUI()
         {
             var root = rootVisualElement;
             AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(
                 $"{StaticData.uxmlDir}/DsaasWindow.uxml").CloneTree(root);
 
-            m_RunButton = root.Q<Button>("run-button");
-            m_RunButton.clicked += UploadToDsaas;
+            m_UploadButton = root.Q<Button>("run-button");
+            m_UploadButton.clicked += UploadToDsaas;
 
             m_ScenarioConfigField = root.Q<ObjectField>("scenario-config");
             m_ScenarioConfigField.objectType = typeof(TextAsset);
@@ -115,12 +111,27 @@ namespace UnityEditor.Perception.Randomization
 
             m_AuthTokenField = root.Q<TextField>("auth-token");
 
+            m_DsaasTemplatesListView = root.Q<ListView>("dsaas_templates");
+
+            m_DsaasSelectedTemplateVersionsListView = root.Q<ListView>("dsaas_versions");
+
+            m_DsaasSelectedTemplateIdLabel = root.Q<Label>("selected_template_id");
+
             SetFieldsFromPlayerPreferences();
+
+            SetupTemplatesList();
         }
 
         void SetFieldsFromPlayerPreferences()
         {
             m_AuthTokenField.value = PlayerPrefs.GetString("latestDsaasAuthToken");
+        }
+
+        void SetupTemplatesList()
+        {
+            m_DsaasTemplatesListView.itemsSource = m_DsaasTemplates;
+            m_DsaasTemplatesListView.itemHeight = 50;
+            m_DsaasTemplatesListView.selectionType = SelectionType.Single;
         }
 
         async void UploadToDsaas()
@@ -161,9 +172,6 @@ namespace UnityEditor.Perception.Randomization
                 throw;
             }
         }
-
-        #region DSaaS
-
 
         string m_AuthToken;
         string m_OrgID = "20066313632537";
@@ -436,10 +444,6 @@ namespace UnityEditor.Perception.Randomization
                 Debug.Log(httpResponse.Content);
             }
         }
-
-
-        #endregion
-
         void ValidateSettings()
         {
             if (string.IsNullOrEmpty(m_BuildParameters.currentOpenScenePath))

@@ -37,8 +37,4 @@
             </VisualElement>
         </VisualElement>
     </VisualElement>
-    <VisualElement style="border-width:1px">
-        <Label text="Temporary DSaaS Controls"/>
-        <TextField name = "auth-token" label="USim Auth Token"/>
-    </VisualElement>
 </UXML>

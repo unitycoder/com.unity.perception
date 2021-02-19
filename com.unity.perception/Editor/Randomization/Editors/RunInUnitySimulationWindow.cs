@@ -2,15 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management.Instrumentation;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Mime;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Unity.Simulation.Client;
@@ -26,8 +20,6 @@ namespace UnityEditor.Perception.Randomization
 {
     class RunInUnitySimulationWindow : EditorWindow
     {
-        readonly HttpClient m_HttpClient = new HttpClient();
-
         string m_BuildDirectory;
         string m_BuildZipPath;
         SysParamDefinition[] m_SysParamDefinitions;
@@ -42,13 +34,6 @@ namespace UnityEditor.Perception.Randomization
         Label m_ProjectIdLabel;
         Label m_PrevExecutionIdLabel;
         RunParameters m_RunParameters;
-
-        #region DSaaS
-
-        TextField m_AuthTokenField;
-
-        #endregion
-
 
         [MenuItem("Window/Run in Unity Simulation")]
         static void ShowWindow()
@@ -146,18 +131,6 @@ namespace UnityEditor.Perception.Randomization
                 EditorGUIUtility.systemCopyBuffer = CloudProjectSettings.projectId;
 
             SetFieldsFromPlayerPreferences();
-
-            #region DSaaS
-
-            m_AuthTokenField = root.Q<TextField>("auth-token");
-            var token = PlayerPrefs.GetString("latestDsaasAuthToken");
-            if (!string.IsNullOrEmpty(token))
-            {
-                m_AuthTokenField.value = token;
-            }
-
-            #endregion
-
         }
 
         void SetFieldsFromPlayerPreferences()
@@ -212,307 +185,16 @@ namespace UnityEditor.Perception.Randomization
             try
             {
                 ValidateSettings();
-                //CreateLinuxBuildAndZip();
-
-                SetDsaasEnvVars();
-                //await UploadAsDsaasTemplate();
-                //await DsaasRefreshTemplates();
-                //await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
-                //await DsaasRefreshTemplateVersions(m_TemplateId);
-                await DsaasCreateNewTemplateVersion(m_TemplateId, true, new List<KeyValuePair<string, string>>
-                {
-                    new KeyValuePair<string, string>("testK3","testV3"),
-                    new KeyValuePair<string, string>("testK23","testV23")
-                });
-                //await UploadBuildToDsaasTemplateVersion(m_TemplateId, m_TemplateVersionId);
-
-                //await StartUnitySimulationRun(runGuid);
+                CreateLinuxBuildAndZip();
+                await StartUnitySimulationRun(runGuid);
             }
             catch (Exception e)
             {
                 EditorUtility.ClearProgressBar();
-                //PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
+                PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
                 throw;
             }
         }
-
-        #region DSaaS
-
-
-        string m_AuthToken;
-        string m_OrgID = "20066313632537";
-        string m_StgUrl = "https://perception-api.stg.simulation.unity3d.com";
-        string m_TemplateId;
-        string m_TemplateVersionId;
-        string m_LatestCreatedTemplateId;
-        string m_LatestCreatedTemplateVersionId;
-        bool m_UseProjectAccessToken = false;
-
-        List<DsaasTempLate> m_DsaasTemplates = new List<DsaasTempLate>();
-        Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
-
-        void SetDsaasEnvVars()
-        {
-            m_AuthToken = m_AuthTokenField.value;
-            if (!string.IsNullOrEmpty(m_AuthToken))
-            {
-                PlayerPrefs.SetString("latestDsaasAuthToken", m_AuthToken);
-            }
-
-            m_TemplateId = "24c233a5-b9f9-4fd1-ba6d-eb8bde5abd46";
-            m_TemplateVersionId = "f34767a1-cc79-41c6-ad91-88d73bedb6ec";
-        }
-
-        struct DsaasTempLate
-        {
-            public string title;
-            public string description;
-            public string id;
-            [JsonProperty("public")]
-            public bool isPublic;
-            public string imgSrc;
-            public string moreInfo;
-        }
-
-        struct DsaasTemplateVersion
-        {
-            public string id;
-            public string templateId;
-            public string version;
-            public bool published;
-            public string authorId;
-            [CanBeNull]
-            public List<KeyValuePair<string, string>> tags;
-        }
-
-        struct DsaasCreateTemplateRequest
-        {
-            public string title;
-            public string description;
-            [JsonProperty("public")]
-            public bool isPublic;
-        }
-
-        struct DsaasCreateTemplateVersionRequest
-        {
-            public bool published;
-            public string version;
-            public string authorId;
-            [CanBeNull]
-            public List<KeyValuePair<string, string>> tags;
-            public JToken randomizers;
-        }
-
-        struct DsaasGenerateUploadUrlRequest
-        {
-            public string filename;
-        }
-
-        async Task DsaasRefreshTemplates()
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.GetAsync(requestUri);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    m_DsaasTemplates.Clear();
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    m_DsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTempLate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasRefreshTemplateVersions(string templateId)
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.GetAsync(requestUri);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    if (m_DsaasTemplateVersions.ContainsKey(templateId))
-                    {
-                        m_DsaasTemplateVersions[templateId].Clear();
-                    }
-                    else
-                    {
-                        m_DsaasTemplateVersions[templateId] = new List<DsaasTemplateVersion>();
-                    }
-
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    var versions = ((JObject)responseJson.GetValue("object"))?.GetValue("versions");
-
-                    if (versions != null && versions.HasValues)
-                    {
-                        m_DsaasTemplateVersions[templateId].AddRange(JsonConvert.DeserializeObject<List<DsaasTemplateVersion>>(versions.ToString()));
-                    }
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasCreateTemplate(string templateTitle, string templateDescription, bool isTemplatePublic)
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/");
-
-            var request = new DsaasCreateTemplateRequest
-            {
-                title = templateTitle,
-                description = templateDescription,
-                isPublic = isTemplatePublic
-            };
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    m_LatestCreatedTemplateId = httpResponse.Headers.Location.Segments.Last();
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasCreateNewTemplateVersion(string templateId, bool published, List<KeyValuePair<string,string>> tags = null)
-        {
-            await DsaasRefreshTemplateVersions(templateId);
-
-            var currentScenario = FindObjectOfType<ScenarioBase>();
-
-            if (!currentScenario)
-            {
-                //Todo: throw exception
-                Debug.Log("No scenario was found.");
-                return;
-            }
-
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions");
-
-            if (!m_DsaasTemplateVersions.TryGetValue(templateId, out var versions))
-            {
-                //TODO: throw exception
-                Debug.Log("Could not retrieve versions list for requested template.");
-                return;
-            }
-
-            versions = versions.OrderByDescending(ver => ver.version).ToList();
-            string newVersionString;
-
-            if (versions.Count != 0)
-            {
-                var currentVersionString = versions.First().version;
-                var currentVersionNumber = float.Parse(currentVersionString.Substring(1));
-                var newVersionNumber = currentVersionNumber + 0.1f;
-                newVersionString = $"v{newVersionNumber}";
-            }
-            else
-            {
-                newVersionString = "V1.0";
-            }
-
-            //TODO: figure out versioning scheme
-
-            var request = new DsaasCreateTemplateVersionRequest
-            {
-                published = published,
-                version = newVersionString,
-                tags = tags,
-                authorId = m_OrgID,
-                randomizers = JObject.Parse(currentScenario.SerializeToJson()).GetValue("randomizers")
-            };
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    m_LatestCreatedTemplateVersionId = httpResponse.Headers.Location.Segments.Last();
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task UploadBuildToDsaasTemplateVersion(string templateId, string templateVersionId)
-        {
-            //CreateLinuxBuildAndZip();
-
-            var projectBuildDirectory = $"{m_BuildDirectory}/{m_RunNameField.value}";
-            m_BuildZipPath = projectBuildDirectory + ".zip";
-
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions/{templateVersionId}:uploadUrl");
-
-            var uploadUrlRequest = new DsaasGenerateUploadUrlRequest()
-            {
-                filename = "test.zip"
-            };
-
-            string uploadUrl = string.Empty;
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(uploadUrlRequest), Encoding.UTF8, "application/json");
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    uploadUrl = responseJson.GetValue("url").ToString();
-                    Debug.Log("expires: " + responseJson.GetValue("expires"));
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-
-            if (!string.IsNullOrEmpty(uploadUrl))
-            {
-                var stream = File.OpenRead(m_BuildZipPath);
-                requestContents = new StreamContent(stream);
-                requestContents.Headers.Add("Content-Type", "application/zip");
-                HttpResponseMessage httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
-
-                Debug.Log(httpResponse.StatusCode);
-                Debug.Log(httpResponse.Headers);
-                Debug.Log(httpResponse.Content);
-            }
-        }
-
-
-        #endregion
 
         void ValidateSettings()
         {
