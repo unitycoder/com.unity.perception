@@ -41,6 +41,7 @@ namespace UnityEditor.Perception.Randomization
         ListView m_DsaasTemplatesListView;
         ListView m_DsaasSelectedTemplateVersionsListView;
         Label m_DsaasSelectedTemplateIdLabel;
+        Button m_DsaasRefreshTemplatesButton;
 
         BuildParameters m_BuildParameters;
 
@@ -51,7 +52,7 @@ namespace UnityEditor.Perception.Randomization
         {
             var window = GetWindow<DsaasWindow>();
             window.titleContent = new GUIContent("DSaaS");
-            window.minSize = new Vector2(250, 50);
+            window.minSize = new Vector2(250, 600);
             window.Show();
         }
 
@@ -102,7 +103,8 @@ namespace UnityEditor.Perception.Randomization
                 $"{StaticData.uxmlDir}/DsaasWindow.uxml").CloneTree(root);
 
             m_UploadButton = root.Q<Button>("run-button");
-            m_UploadButton.clicked += UploadToDsaas;
+            //m_UploadButton.clicked += UploadToDsaas;
+            m_UploadButton.clicked += RefreshLists;
 
             m_ScenarioConfigField = root.Q<ObjectField>("scenario-config");
             m_ScenarioConfigField.objectType = typeof(TextAsset);
@@ -111,15 +113,21 @@ namespace UnityEditor.Perception.Randomization
 
             m_AuthTokenField = root.Q<TextField>("auth-token");
 
-            m_DsaasTemplatesListView = root.Q<ListView>("dsaas_templates");
+            m_DsaasTemplatesListView = root.Q<ListView>("dsaas-templates");
+            m_DsaasTemplatesListView.onSelectionChanged += SelectedTamplateChanged;
 
-            m_DsaasSelectedTemplateVersionsListView = root.Q<ListView>("dsaas_versions");
+            m_DsaasSelectedTemplateVersionsListView = root.Q<ListView>("dsaas-versions");
 
-            m_DsaasSelectedTemplateIdLabel = root.Q<Label>("selected_template_id");
+            m_DsaasSelectedTemplateIdLabel = root.Q<Label>("selected-template-id");
+
+            m_DsaasRefreshTemplatesButton = root.Q<Button>("refresh-templates-button");
+            m_DsaasRefreshTemplatesButton.clicked += RefreshTemplatesBtnClicked;
 
             SetFieldsFromPlayerPreferences();
 
             SetupTemplatesList();
+
+            SetDsaasEnvVars();
         }
 
         void SetFieldsFromPlayerPreferences()
@@ -130,9 +138,22 @@ namespace UnityEditor.Perception.Randomization
         void SetupTemplatesList()
         {
             m_DsaasTemplatesListView.itemsSource = m_DsaasTemplates;
+
+            VisualElement MakeItem() => new Label();
+            void BindItem(VisualElement e, int i) => ((Label)e).text = m_DsaasTemplates[i].ToString();
+
             m_DsaasTemplatesListView.itemHeight = 50;
             m_DsaasTemplatesListView.selectionType = SelectionType.Single;
+            m_DsaasTemplatesListView.makeItem = MakeItem;
+            m_DsaasTemplatesListView.bindItem = BindItem;
         }
+
+        void SelectedTamplateChanged(List<object> objs)
+        {
+            var selectedTemplate = m_DsaasTemplates[m_DsaasTemplatesListView.selectedIndex];
+            //m_DsaasSelectedTemplateVersionsListView.itemsSource =
+        }
+
 
         async void UploadToDsaas()
         {
@@ -182,7 +203,7 @@ namespace UnityEditor.Perception.Randomization
         string m_LatestCreatedTemplateVersionId;
         bool m_UseProjectAccessToken = false;
 
-        List<DsaasTempLate> m_DsaasTemplates = new List<DsaasTempLate>();
+        List<DsaasTemplate> m_DsaasTemplates = new List<DsaasTemplate>();
         Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
 
         void SetDsaasEnvVars()
@@ -197,7 +218,7 @@ namespace UnityEditor.Perception.Randomization
             m_TemplateVersionId = "f34767a1-cc79-41c6-ad91-88d73bedb6ec";
         }
 
-        struct DsaasTempLate
+        class DsaasTemplate
         {
             public string title;
             public string description;
@@ -206,6 +227,16 @@ namespace UnityEditor.Perception.Randomization
             public bool isPublic;
             public string imgSrc;
             public string moreInfo;
+
+            public override string ToString()
+            {
+                return $"Title: {title}\nDescription: {description}\nid:{id}";
+            }
+
+            public override int GetHashCode()
+            {
+                return id.GetHashCode();
+            }
         }
 
         struct DsaasTemplateVersion
@@ -242,6 +273,23 @@ namespace UnityEditor.Perception.Randomization
             public string filename;
         }
 
+        async void RefreshTemplatesBtnClicked()
+        {
+            SetDsaasEnvVars();
+            await DsaasRefreshTemplates();
+            RefreshLists();
+        }
+
+        void RefreshLists()
+        {
+            m_DsaasTemplatesListView.Refresh();
+        }
+
+        void RefreshUI()
+        {
+            RefreshLists();
+        }
+
         async Task DsaasRefreshTemplates()
         {
             m_HttpClient.DefaultRequestHeaders.Clear();
@@ -257,11 +305,12 @@ namespace UnityEditor.Perception.Randomization
                     m_DsaasTemplates.Clear();
                     var responseString = httpResponse.Content.ReadAsStringAsync().Result;
                     var responseJson = JObject.Parse(responseString);
-                    m_DsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTempLate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
+                    m_DsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTemplate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
                 }
             }
             catch (HttpRequestException e)
             {
+                Debug.LogError(e.StackTrace);
             }
         }
 

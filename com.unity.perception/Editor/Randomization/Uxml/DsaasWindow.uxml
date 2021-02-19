@@ -2,15 +2,18 @@
     <VisualElement style="margin: 2 4 2 4;">
         <Style src="../Uss/DsaasWindowStyles.uss"/>
 
+        <TextField name = "auth-token" label="USim Auth Token"/>
+
         <VisualElement style="border-width:1px; border-color:grey; border-radius: 10px; padding: 6px; margin: 5px">
-            <Label text="DSaaS Templates"/>
-            <ListView name="dsaas_templates">
+            <Button name="refresh-templates-button" text="Refresh DSaaS Templates"/>
+            <Label text="DSaaS Templates" class="title-label"/>
+            <ListView name="dsaas-templates" style="height:400px; flex-grow:1; border-width:1px">
             </ListView>
 
             <VisualElement style="visibility: hidden">
                 <Label text="Versions of template:"/>
-                <Label name = "selected_template_id" text=""/>
-                <ListView name="dsaas_versions">
+                <Label name = "selected-template-id" text=""/>
+                <ListView name="dsaas-versions">
                 </ListView>
             </VisualElement>
 
@@ -24,7 +27,6 @@
                                 tooltip="Selects a scenario JSON configuration to load during the run.
                     You can leave this option blank to use the scenario settings currently configured in the editor."/>
             <TextField name="run-name" label="Run Name"/>
-            <TextField name = "auth-token" label="USim Auth Token"/>
 
             <VisualElement style="align-items: center; margin-top: 8px;">
                 <Button name="run-button" text="Build and Run" style="margin: 10px; padding: 2 20; font-size: 13px;"/>

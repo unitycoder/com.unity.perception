@@ -227,7 +227,6 @@ namespace UnityEngine.Perception.GroundTruth
                     }
                 }
             }
-
             return false;
         }
 
