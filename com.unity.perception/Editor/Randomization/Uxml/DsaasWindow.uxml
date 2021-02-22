@@ -1,37 +1,55 @@
-﻿<UXML xmlns="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements">
-    <VisualElement style="margin: 2 4 2 4;">
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <ui:VisualElement style="margin: 2 4 2 4;">
         <Style src="../Uss/DsaasWindowStyles.uss"/>
-
-        <TextField name = "auth-token" label="USim Auth Token"/>
-
-        <VisualElement style="border-width:1px; border-color:grey; border-radius: 10px; padding: 6px; margin: 5px">
-            <Button name="refresh-templates-button" text="Refresh DSaaS Templates"/>
-            <Label text="DSaaS Templates" class="title-label"/>
-            <ListView name="dsaas-templates" style="height:400px; flex-grow:1; border-width:1px">
-            </ListView>
-
-            <VisualElement style="visibility: hidden">
-                <Label text="Versions of template:"/>
-                <Label name = "selected-template-id" text=""/>
-                <ListView name="dsaas-versions">
-                </ListView>
-            </VisualElement>
-
-        </VisualElement>
-
-        <VisualElement style="border-width:1px; border-color:grey; border-radius: 10px; padding: 6px; margin: 5px">
-            <Label text="Upload Build"/>
-
-            <Label text="Optional Configuration" class="sim-window__header-1" style="margin-top: 18px;"/>
-            <editor:ObjectField name="scenario-config" label="Scenario JSON Config" allow-scene-object="false"
-                                tooltip="Selects a scenario JSON configuration to load during the run.
-                    You can leave this option blank to use the scenario settings currently configured in the editor."/>
-            <TextField name="run-name" label="Run Name"/>
-
-            <VisualElement style="align-items: center; margin-top: 8px;">
-                <Button name="run-button" text="Build and Run" style="margin: 10px; padding: 2 20; font-size: 13px;"/>
-            </VisualElement>
-        </VisualElement>
-
-    </VisualElement>
-</UXML>
+        <ui:TextField name="auth-token" label="USim Auth Token" />
+        <ui:VisualElement style="padding: 10px; margin: 5px; flex-grow: 1;">
+            <ui:Button name="refresh-templates-button" text="Refresh DSaaS Data" style="height: 30px; margin: 0;" />
+            <ui:Label text="Refreshing DSaaS Data" name="refreshing" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
+            <ui:Label text="DSaaS Templates" class="title-label" />
+            <ui:VisualElement class="list-view-container">
+                <ui:ListView name="dsaas-templates" style="height: 200px; flex-grow: 1; border-width: 1px;" />
+            </ui:VisualElement>
+            <ui:Label text="Create New Template" class="title-label" style="margin-top: 7px;" />
+            <ui:VisualElement class="list-view-container" style="align-items: flex-end; flex-direction: row; justify-content: center;">
+                <ui:Label text="Title:" />
+                <ui:TextField name="new-template-title" style="width: 100px;" />
+                <ui:Label text="Description:" />
+                <ui:TextField name="new-template-title" style="width: 300px;" />
+                <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
+                <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
+                    <ui:Button name="create-template-button" text="Create" style="margin: 0;" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label text="Creating New Template..." name="creating-template" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
+            <ui:VisualElement name="versions-container" style="display: none; margin-top: 15px;">
+                <ui:Label text="Versions of Selected Template:" class="title-label" />
+                <ui:Label name="selected-template-id" />
+                <ui:VisualElement class="list-view-container">
+                    <ui:Label name="no-versions" text="Selected template has no versions." style="color: red;" />
+                    <ui:ListView name="dsaas-versions" style="flex-grow: 1; height: 200px;" />
+                </ui:VisualElement>
+                <ui:Label text="Create New Version for Selected Template" class="title-label" style="margin-top: 7px;" />
+                <ui:VisualElement class="list-view-container" style="align-items: flex-end; flex-direction: row; justify-content: center;">
+                    <ui:Label text="Title:" />
+                    <ui:TextField name="new-template-title" style="width: 100px;" />
+                    <ui:Label text="Description:" />
+                    <ui:TextField name="new-template-title" style="width: 300px;" />
+                    <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
+                    <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
+                        <ui:Button name="create-template-version-button" text="Create" style="margin: 0;" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label text="Creating New Template Version..." name="creating-template-version" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="upload-section" style="border-color: grey; border-radius: 10px; padding: 6px; margin: 5px;">
+            <ui:Label text="Upload Build to Selected Template Version" class="title-label" />
+            <ui:Label name="selected-version-id" />
+            <uie:ObjectField name="scenario-config" label="Scenario JSON Config" allow-scene-object="false" tooltip="Selects a scenario JSON configuration to load during the run.                     You can leave this option blank to use the scenario settings currently configured in the editor." />
+            <ui:TextField name="run-name" label="Run Name" />
+            <ui:VisualElement style="align-items: center; margin-top: 8px;">
+                <ui:Button name="run-button" text="Upload (and run)" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

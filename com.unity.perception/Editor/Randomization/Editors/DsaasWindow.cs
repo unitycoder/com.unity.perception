@@ -2,19 +2,16 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Management.Instrumentation;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Net.Mime;
 using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
-using JetBrains.Annotations;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Unity.Simulation.Client;
 using UnityEditor.Build.Reporting;
+using UnityEditor.Perception.Dsaas.DataModels;
+using UnityEditor.Perception.Randomization;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.Perception.Randomization.Scenarios;
@@ -22,7 +19,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 using ZipUtility;
 
-namespace UnityEditor.Perception.Randomization
+namespace UnityEditor.Perception.Dsaas
 {
     class DsaasWindow : EditorWindow
     {
@@ -41,18 +38,39 @@ namespace UnityEditor.Perception.Randomization
         ListView m_DsaasTemplatesListView;
         ListView m_DsaasSelectedTemplateVersionsListView;
         Label m_DsaasSelectedTemplateIdLabel;
+        Label m_DsaasSelectedVersionIdLabel;
+        Label m_NoVersionsLabel;
+        Label m_RefreshingLabel;
         Button m_DsaasRefreshTemplatesButton;
+        Button m_DsaasCreateNewTemplate;
+        Button m_DsaasCreateNewTemplateVersion;
+        VisualElement m_VersionsContainer;
+        VisualElement m_UploadSection;
 
         BuildParameters m_BuildParameters;
 
         TextField m_AuthTokenField;
+
+
+        string m_AuthToken;
+        string m_OrgID = "20066313632537";
+        string m_StgUrl = "https://perception-api.stg.simulation.unity3d.com";
+        string m_SelectedTemplateId;
+        string m_SelectedTemplateVersionId;
+        bool m_UseProjectAccessToken = false;
+
+        List<DsaasTemplate> m_DsaasTemplates = new List<DsaasTemplate>();
+        Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
+        List<DsaasTemplateVersion> m_DsaasSelectedTemplateVersions = new List<DsaasTemplateVersion>();
+
 
         [MenuItem("Window/Upload to DSaaS...")]
         static void ShowWindow()
         {
             var window = GetWindow<DsaasWindow>();
             window.titleContent = new GUIContent("DSaaS");
-            window.minSize = new Vector2(250, 600);
+            window.minSize = new Vector2(700, 900);
+            window.maxSize = window.minSize;
             window.Show();
         }
 
@@ -114,18 +132,37 @@ namespace UnityEditor.Perception.Randomization
             m_AuthTokenField = root.Q<TextField>("auth-token");
 
             m_DsaasTemplatesListView = root.Q<ListView>("dsaas-templates");
-            m_DsaasTemplatesListView.onSelectionChanged += SelectedTamplateChanged;
+            m_DsaasTemplatesListView.onSelectionChanged += SelectedTemplateChanged;
 
             m_DsaasSelectedTemplateVersionsListView = root.Q<ListView>("dsaas-versions");
+            m_DsaasSelectedTemplateVersionsListView.onSelectionChanged += SelectedTemplateVersionChanged;
 
             m_DsaasSelectedTemplateIdLabel = root.Q<Label>("selected-template-id");
+
+            m_DsaasSelectedVersionIdLabel = root.Q<Label>("selected-version-id");
+
+            m_NoVersionsLabel = root.Q<Label>("no-versions");
+
+            m_RefreshingLabel = root.Q<Label>("refreshing");
 
             m_DsaasRefreshTemplatesButton = root.Q<Button>("refresh-templates-button");
             m_DsaasRefreshTemplatesButton.clicked += RefreshTemplatesBtnClicked;
 
+            m_VersionsContainer = root.Q<VisualElement>("versions-container");
+
+            m_UploadSection = root.Q<VisualElement>("upload-section");
+            m_UploadSection.SetEnabled(false);
+
+            m_DsaasCreateNewTemplate = root.Q<Button>("create-template-button");
+            m_DsaasCreateNewTemplate.clicked += CreateTemplateBtnPressed;
+
+            m_DsaasCreateNewTemplateVersion = root.Q<Button>("create-template-version-button");
+            m_DsaasCreateNewTemplateVersion.clicked += CreateTemplateVersionBtnPressed;
+
             SetFieldsFromPlayerPreferences();
 
             SetupTemplatesList();
+            SetupTemplateVersionsList();
 
             SetDsaasEnvVars();
         }
@@ -148,13 +185,69 @@ namespace UnityEditor.Perception.Randomization
             m_DsaasTemplatesListView.bindItem = BindItem;
         }
 
-        void SelectedTamplateChanged(List<object> objs)
+        void SetupTemplateVersionsList()
         {
-            var selectedTemplate = m_DsaasTemplates[m_DsaasTemplatesListView.selectedIndex];
-            //m_DsaasSelectedTemplateVersionsListView.itemsSource =
+            m_DsaasSelectedTemplateVersionsListView.itemsSource = m_DsaasSelectedTemplateVersions;
+
+            VisualElement MakeItem() => new Label();
+            void BindItem(VisualElement e, int i) => ((Label)e).text = m_DsaasSelectedTemplateVersions[i].ToString();
+
+            m_DsaasSelectedTemplateVersionsListView.itemHeight = 50;
+            m_DsaasSelectedTemplateVersionsListView.selectionType = SelectionType.Single;
+            m_DsaasSelectedTemplateVersionsListView.makeItem = MakeItem;
+            m_DsaasSelectedTemplateVersionsListView.bindItem = BindItem;
         }
 
+        void SelectedTemplateChanged(List<object> objs)
+        {
+            DisableUploadSectionUI();
+            //m_DsaasSelectedTemplateVersionsListView.selectedIndex = 0;
 
+            var selectedTemplate = m_DsaasTemplates[m_DsaasTemplatesListView.selectedIndex];
+
+            m_SelectedTemplateId = selectedTemplate.id;
+
+            m_DsaasSelectedTemplateIdLabel.text = "Selected template id: " + selectedTemplate.id;
+
+            var versions = m_DsaasTemplateVersions[selectedTemplate.id];
+            if (versions == null)
+            {
+                m_VersionsContainer.style.display = DisplayStyle.None;
+
+                //TODO: throw exception
+                return;
+            }
+
+            m_VersionsContainer.style.display = DisplayStyle.Flex;
+            m_NoVersionsLabel.style.display = versions.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            m_DsaasSelectedTemplateVersions.Clear();
+            m_DsaasSelectedTemplateVersions.AddRange(versions);
+
+            RefreshLists();
+        }
+
+        void SelectedTemplateVersionChanged(List<object> objs)
+        {
+            if (m_DsaasSelectedTemplateVersions.Count == 0 || m_DsaasSelectedTemplateVersions.Count <= m_DsaasSelectedTemplateVersionsListView.selectedIndex)
+            {
+                DisableUploadSectionUI();
+                return;
+            }
+
+            var selectedTemplateVersion = m_DsaasSelectedTemplateVersions[m_DsaasSelectedTemplateVersionsListView.selectedIndex];
+            m_SelectedTemplateVersionId = selectedTemplateVersion.id;
+
+            m_DsaasSelectedVersionIdLabel.text = "Selected template version id: " + selectedTemplateVersion.id;
+
+            m_UploadSection.SetEnabled(true);
+        }
+
+        void DisableUploadSectionUI()
+        {
+            m_SelectedTemplateVersionId = string.Empty;
+            m_UploadSection.SetEnabled(false);
+            m_DsaasSelectedVersionIdLabel.text = "Selected template version id: ";
+        }
         async void UploadToDsaas()
         {
             m_BuildParameters = new BuildParameters
@@ -177,7 +270,7 @@ namespace UnityEditor.Perception.Randomization
                 //await DsaasRefreshTemplates();
                 //await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
                 //await DsaasRefreshTemplateVersions(m_TemplateId);
-                await DsaasCreateNewTemplateVersion(m_TemplateId, true, new List<KeyValuePair<string, string>>
+                await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>
                 {
                     new KeyValuePair<string, string>("testK3","testV3"),
                     new KeyValuePair<string, string>("testK23","testV23")
@@ -194,18 +287,6 @@ namespace UnityEditor.Perception.Randomization
             }
         }
 
-        string m_AuthToken;
-        string m_OrgID = "20066313632537";
-        string m_StgUrl = "https://perception-api.stg.simulation.unity3d.com";
-        string m_TemplateId;
-        string m_TemplateVersionId;
-        string m_LatestCreatedTemplateId;
-        string m_LatestCreatedTemplateVersionId;
-        bool m_UseProjectAccessToken = false;
-
-        List<DsaasTemplate> m_DsaasTemplates = new List<DsaasTemplate>();
-        Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
-
         void SetDsaasEnvVars()
         {
             m_AuthToken = m_AuthTokenField.value;
@@ -214,58 +295,8 @@ namespace UnityEditor.Perception.Randomization
                 PlayerPrefs.SetString("latestDsaasAuthToken", m_AuthToken);
             }
 
-            m_TemplateId = "24c233a5-b9f9-4fd1-ba6d-eb8bde5abd46";
-            m_TemplateVersionId = "f34767a1-cc79-41c6-ad91-88d73bedb6ec";
-        }
-
-        class DsaasTemplate
-        {
-            public string title;
-            public string description;
-            public string id;
-            [JsonProperty("public")]
-            public bool isPublic;
-            public string imgSrc;
-            public string moreInfo;
-
-            public override string ToString()
-            {
-                return $"Title: {title}\nDescription: {description}\nid:{id}";
-            }
-
-            public override int GetHashCode()
-            {
-                return id.GetHashCode();
-            }
-        }
-
-        struct DsaasTemplateVersion
-        {
-            public string id;
-            public string templateId;
-            public string version;
-            public bool published;
-            public string authorId;
-            [CanBeNull]
-            public List<KeyValuePair<string, string>> tags;
-        }
-
-        struct DsaasCreateTemplateRequest
-        {
-            public string title;
-            public string description;
-            [JsonProperty("public")]
-            public bool isPublic;
-        }
-
-        struct DsaasCreateTemplateVersionRequest
-        {
-            public bool published;
-            public string version;
-            public string authorId;
-            [CanBeNull]
-            public List<KeyValuePair<string, string>> tags;
-            public JToken randomizers;
+            m_SelectedTemplateId = "24c233a5-b9f9-4fd1-ba6d-eb8bde5abd46";
+            m_SelectedTemplateVersionId = "f34767a1-cc79-41c6-ad91-88d73bedb6ec";
         }
 
         struct DsaasGenerateUploadUrlRequest
@@ -275,14 +306,38 @@ namespace UnityEditor.Perception.Randomization
 
         async void RefreshTemplatesBtnClicked()
         {
+            m_RefreshingLabel.style.visibility = Visibility.Visible;
+
+            m_DsaasTemplatesListView.SetEnabled(false);
+            m_DsaasSelectedTemplateVersionsListView.SetEnabled(false);
+
             SetDsaasEnvVars();
             await DsaasRefreshTemplates();
+            foreach (var template in m_DsaasTemplates)
+            {
+                await DsaasRefreshTemplateVersions(template.id);
+            }
             RefreshLists();
+
+            m_DsaasTemplatesListView.SetEnabled(true);
+            m_DsaasSelectedTemplateVersionsListView.SetEnabled(true);
+
+            m_RefreshingLabel.style.visibility = Visibility.Hidden;
         }
 
+        async void CreateTemplateBtnPressed()
+        {
+            await DsaasCreateTemplate("test", "test description", true);
+        }
+
+        async void CreateTemplateVersionBtnPressed()
+        {
+            await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>());
+        }
         void RefreshLists()
         {
             m_DsaasTemplatesListView.Refresh();
+            m_DsaasSelectedTemplateVersionsListView.Refresh();
         }
 
         void RefreshUI()
@@ -306,6 +361,10 @@ namespace UnityEditor.Perception.Randomization
                     var responseString = httpResponse.Content.ReadAsStringAsync().Result;
                     var responseJson = JObject.Parse(responseString);
                     m_DsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTemplate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
+                }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
                 }
             }
             catch (HttpRequestException e)
@@ -344,6 +403,10 @@ namespace UnityEditor.Perception.Randomization
                         m_DsaasTemplateVersions[templateId].AddRange(JsonConvert.DeserializeObject<List<DsaasTemplateVersion>>(versions.ToString()));
                     }
                 }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
+                }
             }
             catch (HttpRequestException e)
             {
@@ -371,7 +434,13 @@ namespace UnityEditor.Perception.Randomization
                 HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
                 if (httpResponse.IsSuccessStatusCode)
                 {
-                    m_LatestCreatedTemplateId = httpResponse.Headers.Location.Segments.Last();
+                    //m_LatestCreatedTemplateId = httpResponse.Headers.Location.Segments.Last();
+                    await DsaasRefreshTemplates();
+                    RefreshLists();
+                }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
                 }
             }
             catch (HttpRequestException e)
@@ -437,7 +506,14 @@ namespace UnityEditor.Perception.Randomization
                 HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
                 if (httpResponse.IsSuccessStatusCode)
                 {
-                    m_LatestCreatedTemplateVersionId = httpResponse.Headers.Location.Segments.Last();
+                    //m_LatestCreatedTemplateVersionId = httpResponse.Headers.Location.Segments.Last();
+                    await DsaasRefreshTemplateVersions(templateId);
+                    SelectedTemplateChanged(null);
+                    RefreshLists();
+                }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
                 }
             }
             catch (HttpRequestException e)
@@ -476,6 +552,10 @@ namespace UnityEditor.Perception.Randomization
                     uploadUrl = responseJson.GetValue("url").ToString();
                     Debug.Log("expires: " + responseJson.GetValue("expires"));
                 }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
+                }
             }
             catch (HttpRequestException e)
             {
@@ -487,11 +567,12 @@ namespace UnityEditor.Perception.Randomization
                 requestContents = new StreamContent(stream);
                 requestContents.Headers.Add("Content-Type", "application/zip");
                 HttpResponseMessage httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
-
-                Debug.Log(httpResponse.StatusCode);
-                Debug.Log(httpResponse.Headers);
-                Debug.Log(httpResponse.Content);
             }
+        }
+
+        static void DsaasHandleErrors(HttpResponseMessage responseMessage)
+        {
+            Debug.LogError("DSaaS API call failed with reason: " + responseMessage.ReasonPhrase);
         }
         void ValidateSettings()
         {
