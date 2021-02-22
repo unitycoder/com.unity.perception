@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Upgrade Notes
 
+All appearances of the term `KeyPoint` have been renamed to `Keypoint`. Therefore, after upgrading to this version, if you have code that relies on any renamed types or names, make sure to alter your code to reflect the new names.
+
 ### Known Issues
 
 ### Added
@@ -18,6 +20,8 @@ Scenario serialization has been updated to include scalar values on randomizers 
 Added new ScenarioBase virtual lifecycle hooks: OnAwake, OnStart, OnComplete, and OnIdle.
 
 ### Changed
+
+Renamed all appearances of the term `KeyPoint` within types and names to `Keypoint`.
 
 ScenarioBase's Awake, Start, and Update methods are now private. The newly added virtual lifecycle hooks are to be used as replacements.
 
@@ -29,11 +33,17 @@ ScenarioBase's Get and Create randomizer methods have been augmented or replaced
 
 The scenario inspector buttons serialize and deserialize have been refactored to open a file explorer generate and import JSON configurations.
 
+Randomizer tags now use OnEnable and OnDisable to manage lifecycle. This allows the user to toggle them on and off in the editor.
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+Fixed a null reference error that appeared when adding options to categorical parameters.
+
+Fixed ground truth not properly produced when there are other disabled PerceptionCameras present. Note: this does not yet add support for multiple enabled PerceptionCameras.
 
 ## [0.7.0-preview.2] - 2021-02-08
 
