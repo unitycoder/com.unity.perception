@@ -1,27 +1,27 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
-    <ui:VisualElement style="margin: 2 4 2 4;">
-        <Style src="../Uss/DsaasWindowStyles.uss"/>
+    <ui:VisualElement>
+        <Style src="/Packages/com.unity.perception/Editor/Randomization/Uss/DsaasWindowStyles.uss" />
         <ui:TextField name="auth-token" label="USim Auth Token" />
         <ui:VisualElement style="padding: 10px; margin: 5px; flex-grow: 1;">
-            <ui:Button name="refresh-templates-button" text="Refresh DSaaS Data" style="height: 30px; margin: 0;" />
-            <ui:Label text="Refreshing DSaaS Data" name="refreshing" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
+            <ui:Button name="refresh-templates-button" text="Refresh DSaaS Templates" style="height: 30px; margin: 0;" />
+            <ui:Label text="Refreshing DSaaS Templates..." name="refreshing" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
             <ui:Label text="DSaaS Templates" class="title-label" />
             <ui:VisualElement class="list-view-container">
                 <ui:ListView name="dsaas-templates" style="height: 200px; flex-grow: 1; border-width: 1px;" />
             </ui:VisualElement>
             <ui:Label text="Create New Template" class="title-label" style="margin-top: 7px;" />
-            <ui:VisualElement class="list-view-container" style="align-items: flex-end; flex-direction: row; justify-content: center;">
+            <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
                 <ui:Label text="Title:" />
                 <ui:TextField name="new-template-title" style="width: 100px;" />
                 <ui:Label text="Description:" />
-                <ui:TextField name="new-template-title" style="width: 300px;" />
+                <ui:TextField name="new-template-description" style="width: 340px;" />
                 <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
                 <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
                     <ui:Button name="create-template-button" text="Create" style="margin: 0;" />
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:Label text="Creating New Template..." name="creating-template" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
-            <ui:VisualElement name="versions-container" style="display: none; margin-top: 15px;">
+            <ui:VisualElement name="versions-container" style="display: flex; margin-top: 15px;">
                 <ui:Label text="Versions of Selected Template:" class="title-label" />
                 <ui:Label name="selected-template-id" />
                 <ui:VisualElement class="list-view-container">
@@ -29,12 +29,8 @@
                     <ui:ListView name="dsaas-versions" style="flex-grow: 1; height: 200px;" />
                 </ui:VisualElement>
                 <ui:Label text="Create New Version for Selected Template" class="title-label" style="margin-top: 7px;" />
-                <ui:VisualElement class="list-view-container" style="align-items: flex-end; flex-direction: row; justify-content: center;">
-                    <ui:Label text="Title:" />
-                    <ui:TextField name="new-template-title" style="width: 100px;" />
-                    <ui:Label text="Description:" />
-                    <ui:TextField name="new-template-title" style="width: 300px;" />
-                    <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
+                <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
+                    <ui:Toggle name="version-publish-toggle" text="Publish Version" style="height: 14px; width: 120px;" />
                     <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
                         <ui:Button name="create-template-version-button" text="Create" style="margin: 0;" />
                     </ui:VisualElement>
@@ -44,11 +40,22 @@
         </ui:VisualElement>
         <ui:VisualElement name="upload-section" style="border-color: grey; border-radius: 10px; padding: 6px; margin: 5px;">
             <ui:Label text="Upload Build to Selected Template Version" class="title-label" />
+
             <ui:Label name="selected-version-id" />
-            <uie:ObjectField name="scenario-config" label="Scenario JSON Config" allow-scene-object="false" tooltip="Selects a scenario JSON configuration to load during the run.                     You can leave this option blank to use the scenario settings currently configured in the editor." />
-            <ui:TextField name="run-name" label="Run Name" />
-            <ui:VisualElement style="align-items: center; margin-top: 8px;">
-                <ui:Button name="run-button" text="Upload (and run)" />
+            <ui:VisualElement class="list-view-container">
+                <uie:ObjectField name="dsaas-config" label="DSaaS JSON Config" allow-scene-object="false" tooltip="Selects a DSaaS JSON configuration to upload along with the built player. \nYou can leave this option blank to use a default config containing all available Randomizers, Parameters, and Samplers, with values set in the Scenario editor." />
+                <ui:TextField name="run-name" label="Run Name" />
+                <ui:VisualElement style="align-items: center; margin-top: 8px;">
+                    <ui:Button name="upload-button" text="Upload" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:Label text="Run Selected Template Version" class="title-label" style = "margin-top:5px" />
+            <ui:VisualElement class="list-view-container">
+                <ui:TextField name="iterations" label="Iterations" />
+                <ui:VisualElement style="align-items: center; margin-top: 8px;">
+                    <ui:Button name="run-button" text="Run" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

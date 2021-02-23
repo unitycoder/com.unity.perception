@@ -70,4 +70,26 @@ namespace UnityEditor.Perception.Dsaas.DataModels
         public List<KeyValuePair<string, string>> tags;
         public JToken randomizers;
     }
+
+    [Serializable]
+    struct DsaasRunRequestTemplateVersion
+    {
+        public string id;
+        public string templateId;
+    }
+
+    [Serializable]
+    struct DsaasRunConfig
+    {
+        public int iterations;
+    }
+
+    [Serializable]
+    struct DsaasCreateRunRequest
+    {
+        public DsaasRunRequestTemplateVersion version;
+        public JToken randomizations;
+        public List<string> assets;
+        public DsaasRunConfig runConfig;
+    }
 }

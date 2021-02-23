@@ -32,9 +32,8 @@ namespace UnityEditor.Perception.Dsaas
         TextField m_BuildNameField;
         ObjectField m_ScenarioConfigField;
         Button m_UploadButton;
-
+        Button m_RunButton;
         Label m_ProjectIdLabel;
-
         ListView m_DsaasTemplatesListView;
         ListView m_DsaasSelectedTemplateVersionsListView;
         Label m_DsaasSelectedTemplateIdLabel;
@@ -46,15 +45,19 @@ namespace UnityEditor.Perception.Dsaas
         Button m_DsaasCreateNewTemplateVersion;
         VisualElement m_VersionsContainer;
         VisualElement m_UploadSection;
+        TextField m_NewTemplateTitle;
+        TextField m_NewTemplateDescription;
+        Toggle m_NewTemplateIsPublic;
+        Toggle m_NewVersionPublish;
 
         BuildParameters m_BuildParameters;
 
         TextField m_AuthTokenField;
 
-
         string m_AuthToken;
         string m_OrgID = "20066313632537";
         string m_StgUrl = "https://perception-api.stg.simulation.unity3d.com";
+        string m_ProjectID = "f29ae914-a9d6-4e7a-970d-c6a6cc3139df";
         string m_SelectedTemplateId;
         string m_SelectedTemplateVersionId;
         bool m_UseProjectAccessToken = false;
@@ -69,7 +72,7 @@ namespace UnityEditor.Perception.Dsaas
         {
             var window = GetWindow<DsaasWindow>();
             window.titleContent = new GUIContent("DSaaS");
-            window.minSize = new Vector2(700, 900);
+            window.minSize = new Vector2(740, 900);
             window.maxSize = window.minSize;
             window.Show();
         }
@@ -120,11 +123,12 @@ namespace UnityEditor.Perception.Dsaas
             AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(
                 $"{StaticData.uxmlDir}/DsaasWindow.uxml").CloneTree(root);
 
-            m_UploadButton = root.Q<Button>("run-button");
-            //m_UploadButton.clicked += UploadToDsaas;
-            m_UploadButton.clicked += RefreshLists;
+            m_UploadButton = root.Q<Button>("upload-button");
+            m_UploadButton.clicked += UploadToDsaas;
+            m_RunButton = root.Q<Button>("run-button");
+            m_RunButton.clicked += CreateDsaasRun;
 
-            m_ScenarioConfigField = root.Q<ObjectField>("scenario-config");
+            m_ScenarioConfigField = root.Q<ObjectField>("dsaas-config");
             m_ScenarioConfigField.objectType = typeof(TextAsset);
 
             m_BuildNameField = root.Q<TextField>("run-name");
@@ -158,6 +162,12 @@ namespace UnityEditor.Perception.Dsaas
 
             m_DsaasCreateNewTemplateVersion = root.Q<Button>("create-template-version-button");
             m_DsaasCreateNewTemplateVersion.clicked += CreateTemplateVersionBtnPressed;
+
+            m_NewTemplateTitle = root.Q<TextField>("new-template-title");
+            m_NewTemplateDescription = root.Q<TextField>("new-template-description");
+            m_NewTemplateIsPublic = root.Q<Toggle>("template-public-toggle");
+
+            m_NewVersionPublish = root.Q<Toggle>("version-publish-toggle");
 
             SetFieldsFromPlayerPreferences();
 
@@ -198,7 +208,7 @@ namespace UnityEditor.Perception.Dsaas
             m_DsaasSelectedTemplateVersionsListView.bindItem = BindItem;
         }
 
-        void SelectedTemplateChanged(List<object> objs)
+        async void SelectedTemplateChanged(List<object> objs)
         {
             DisableUploadSectionUI();
             //m_DsaasSelectedTemplateVersionsListView.selectedIndex = 0;
@@ -209,13 +219,23 @@ namespace UnityEditor.Perception.Dsaas
 
             m_DsaasSelectedTemplateIdLabel.text = "Selected template id: " + selectedTemplate.id;
 
-            var versions = m_DsaasTemplateVersions[selectedTemplate.id];
-            if (versions == null)
-            {
-                m_VersionsContainer.style.display = DisplayStyle.None;
 
-                //TODO: throw exception
-                return;
+            if (!m_DsaasTemplateVersions.TryGetValue(selectedTemplate.id, out var versions))
+            {
+                await DsaasRefreshTemplateVersions(selectedTemplate.id);
+                //the template versions should have already been downloaded, but try once more just in case there was an issue before
+
+                if (m_DsaasTemplateVersions.ContainsKey(selectedTemplate.id))
+                {
+                    versions = m_DsaasTemplateVersions[selectedTemplate.id];
+                }
+                else
+                {
+                    m_VersionsContainer.style.display = DisplayStyle.None;
+
+                    //TODO: throw exception
+                    return;
+                }
             }
 
             m_VersionsContainer.style.display = DisplayStyle.Flex;
@@ -263,18 +283,19 @@ namespace UnityEditor.Perception.Dsaas
             try
             {
                 ValidateSettings();
-                //CreateLinuxBuildAndZip();
 
-                SetDsaasEnvVars();
+                await DsaasUploadBuildToTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId);
+
+                //SetDsaasEnvVars();
                 //await UploadAsDsaasTemplate();
                 //await DsaasRefreshTemplates();
                 //await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
                 //await DsaasRefreshTemplateVersions(m_TemplateId);
-                await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>
-                {
-                    new KeyValuePair<string, string>("testK3","testV3"),
-                    new KeyValuePair<string, string>("testK23","testV23")
-                });
+                // await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>
+                // {
+                //     new KeyValuePair<string, string>("testK3","testV3"),
+                //     new KeyValuePair<string, string>("testK23","testV23")
+                // });
                 //await UploadBuildToDsaasTemplateVersion(m_TemplateId, m_TemplateVersionId);
 
                 //await StartUnitySimulationRun(runGuid);
@@ -285,6 +306,11 @@ namespace UnityEditor.Perception.Dsaas
                 //PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
                 throw;
             }
+        }
+
+        async void CreateDsaasRun()
+        {
+            await DsaasCreateRunForTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, 100);
         }
 
         void SetDsaasEnvVars()
@@ -327,7 +353,7 @@ namespace UnityEditor.Perception.Dsaas
 
         async void CreateTemplateBtnPressed()
         {
-            await DsaasCreateTemplate("test", "test description", true);
+            await DsaasCreateTemplate(m_NewTemplateTitle.text, m_NewTemplateDescription.text, m_NewTemplateIsPublic.value);
         }
 
         async void CreateTemplateVersionBtnPressed()
@@ -434,8 +460,9 @@ namespace UnityEditor.Perception.Dsaas
                 HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
                 if (httpResponse.IsSuccessStatusCode)
                 {
-                    //m_LatestCreatedTemplateId = httpResponse.Headers.Location.Segments.Last();
+                    var templateId = httpResponse.Headers.Location.Segments.Last();
                     await DsaasRefreshTemplates();
+                    await DsaasRefreshTemplateVersions(templateId);
                     RefreshLists();
                 }
                 else
@@ -521,9 +548,9 @@ namespace UnityEditor.Perception.Dsaas
             }
         }
 
-        async Task UploadBuildToDsaasTemplateVersion(string templateId, string templateVersionId)
+        async Task DsaasUploadBuildToTemplateVersion(string templateId, string templateVersionId)
         {
-            //CreateLinuxBuildAndZip();
+            CreateLinuxBuildAndZip();
 
             var projectBuildDirectory = $"{m_BuildDirectory}/{m_BuildNameField.value}";
             m_BuildZipPath = projectBuildDirectory + ".zip";
@@ -538,12 +565,12 @@ namespace UnityEditor.Perception.Dsaas
                 filename = "test.zip"
             };
 
-            string uploadUrl = string.Empty;
+            var uploadUrl = string.Empty;
 
             HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(uploadUrlRequest), Encoding.UTF8, "application/json");
             try
             {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
+                var httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
 
                 if (httpResponse.IsSuccessStatusCode)
                 {
@@ -566,7 +593,63 @@ namespace UnityEditor.Perception.Dsaas
                 var stream = File.OpenRead(m_BuildZipPath);
                 requestContents = new StreamContent(stream);
                 requestContents.Headers.Add("Content-Type", "application/zip");
-                HttpResponseMessage httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
+
+                try
+                {
+                    var httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
+
+                    if (httpResponse.IsSuccessStatusCode)
+                    {
+                        Debug.Log("build uploaded!");
+                    }
+                    else
+                    {
+                        DsaasHandleErrors(httpResponse);
+                    }
+                }
+                catch (HttpRequestException e)
+                {
+                }
+            }
+        }
+
+        async Task DsaasCreateRunForTemplateVersion(string templateId, string templateVersionId, int iterations)
+        {
+            m_HttpClient.DefaultRequestHeaders.Clear();
+            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
+
+            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/projects/{m_ProjectID}/runs");
+
+            var request = new DsaasCreateRunRequest()
+            {
+                assets = new List<string>(),
+                version = new DsaasRunRequestTemplateVersion()
+                {
+                    id = templateVersionId,
+                    templateId = templateId
+                },
+                runConfig = new DsaasRunConfig()
+                {
+                    iterations = iterations
+                },
+                randomizations = new JObject()
+            };
+
+            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
+
+            try
+            {
+                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
+                if (httpResponse.IsSuccessStatusCode)
+                {
+                }
+                else
+                {
+                    DsaasHandleErrors(httpResponse);
+                }
+            }
+            catch (HttpRequestException e)
+            {
             }
         }
 
