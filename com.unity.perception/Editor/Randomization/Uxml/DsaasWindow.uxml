@@ -21,7 +21,7 @@
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:Label text="Creating New Template..." name="creating-template" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
-            <ui:VisualElement name="versions-container" style="display: flex; margin-top: 15px;">
+            <ui:VisualElement name="versions-container" style="display: none; margin-top: 15px;">
                 <ui:Label text="Versions of Selected Template:" class="title-label" />
                 <ui:Label name="selected-template-id" />
                 <ui:VisualElement class="list-view-container">
@@ -38,24 +38,31 @@
                 <ui:Label text="Creating New Template Version..." name="creating-template-version" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="upload-section" style="border-color: grey; border-radius: 10px; padding: 6px; margin: 5px;">
+        <ui:VisualElement name="upload-section" style="border-color: grey; border-radius: 10px; padding: 6px; margin: 5px; padding-bottom: 0;">
             <ui:Label text="Upload Build to Selected Template Version" class="title-label" />
-
             <ui:Label name="selected-version-id" />
-            <ui:VisualElement class="list-view-container">
+            <ui:VisualElement name="VisualElement" class="list-view-container">
+                <ui:Toggle name="create-new-build" text="Create New Build" />
+                <ui:VisualElement name="build-select-controls" style="margin-bottom: 10px;">
+                    <ui:TextField name="selected-build-path" label="Selected File" />
+                    <ui:VisualElement style="align-items: flex-end; flex-direction: row; justify-content: flex-end;">
+                        <ui:Button name="select-build-file-button" text="Browse..." style="margin: 0; align-items: flex-end; margin-top: 3px;" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
                 <uie:ObjectField name="dsaas-config" label="DSaaS JSON Config" allow-scene-object="false" tooltip="Selects a DSaaS JSON configuration to upload along with the built player. \nYou can leave this option blank to use a default config containing all available Randomizers, Parameters, and Samplers, with values set in the Scenario editor." />
-                <ui:TextField name="run-name" label="Run Name" />
-                <ui:VisualElement style="align-items: center; margin-top: 8px;">
-                    <ui:Button name="upload-button" text="Upload" />
+                <ui:TextField name="run-name" label="Build Name" />
+                <ui:VisualElement style="align-items: center; margin-top: 0; justify-content: center;">
+                    <ui:Button name="upload-button" text="Upload" style="justify-content: center; margin-top: 15px; align-items: center; width: 150px;" />
                 </ui:VisualElement>
+                <ui:Label text="Uploading Build..." name="uploading-build" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
             </ui:VisualElement>
-
-            <ui:Label text="Run Selected Template Version" class="title-label" style = "margin-top:5px" />
-            <ui:VisualElement class="list-view-container">
+            <ui:Label text="Run Selected Template Version" class="title-label" style="margin-top: 5px;" />
+            <ui:VisualElement class="list-view-container" style="padding-bottom: 0;">
                 <ui:TextField name="iterations" label="Iterations" />
-                <ui:VisualElement style="align-items: center; margin-top: 8px;">
-                    <ui:Button name="run-button" text="Run" />
+                <ui:VisualElement style="align-items: center; margin-top: 15px;">
+                    <ui:Button name="run-button" text="Run" style="align-items: center; width: 150px;" />
                 </ui:VisualElement>
+                <ui:Label text="Creating Run..." name="creating-run" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

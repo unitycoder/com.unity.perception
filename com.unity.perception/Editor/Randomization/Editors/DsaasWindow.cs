@@ -40,15 +40,24 @@ namespace UnityEditor.Perception.Dsaas
         Label m_DsaasSelectedVersionIdLabel;
         Label m_NoVersionsLabel;
         Label m_RefreshingLabel;
+        Label m_CreatingTemplateLabel;
+        Label m_CreatingTemplateVersionLabel;
+        Label m_CreatingRunLabel;
+        Label m_UploadingBuildLabel;
         Button m_DsaasRefreshTemplatesButton;
         Button m_DsaasCreateNewTemplate;
         Button m_DsaasCreateNewTemplateVersion;
+        Button m_SelectBuildButton;
         VisualElement m_VersionsContainer;
         VisualElement m_UploadSection;
+        VisualElement m_BuildSelectControls;
         TextField m_NewTemplateTitle;
         TextField m_NewTemplateDescription;
+        TextField m_SelectedBuildPathTextField;
         Toggle m_NewTemplateIsPublic;
         Toggle m_NewVersionPublish;
+        Toggle m_CreateNewBuildToggle;
+
 
         BuildParameters m_BuildParameters;
 
@@ -72,7 +81,7 @@ namespace UnityEditor.Perception.Dsaas
         {
             var window = GetWindow<DsaasWindow>();
             window.titleContent = new GUIContent("DSaaS");
-            window.minSize = new Vector2(740, 900);
+            window.minSize = new Vector2(740, 1100);
             window.maxSize = window.minSize;
             window.Show();
         }
@@ -148,6 +157,10 @@ namespace UnityEditor.Perception.Dsaas
             m_NoVersionsLabel = root.Q<Label>("no-versions");
 
             m_RefreshingLabel = root.Q<Label>("refreshing");
+            m_CreatingTemplateLabel = root.Q<Label>("creating-template");
+            m_CreatingTemplateVersionLabel = root.Q<Label>("creating-template-version");
+            m_CreatingRunLabel = root.Q<Label>("creating-run");
+            m_UploadingBuildLabel = root.Q<Label>("uploading-build");
 
             m_DsaasRefreshTemplatesButton = root.Q<Button>("refresh-templates-button");
             m_DsaasRefreshTemplatesButton.clicked += RefreshTemplatesBtnClicked;
@@ -168,6 +181,32 @@ namespace UnityEditor.Perception.Dsaas
             m_NewTemplateIsPublic = root.Q<Toggle>("template-public-toggle");
 
             m_NewVersionPublish = root.Q<Toggle>("version-publish-toggle");
+            m_NewVersionPublish.visible = false;
+            m_NewVersionPublish.value = true;
+
+            m_CreateNewBuildToggle = root.Q<Toggle>("create-new-build");
+            m_CreateNewBuildToggle.value = true;
+
+            m_CreateNewBuildToggle.RegisterCallback<MouseUpEvent>(evt =>
+            {
+                ApplyNewBuildCreationState();
+            });
+
+            m_BuildSelectControls = root.Q<VisualElement>("build-select-controls");
+            m_BuildSelectControls.SetEnabled(!m_CreateNewBuildToggle.value);
+
+            m_SelectedBuildPathTextField = root.Q<TextField>("selected-build-path");
+            m_SelectedBuildPathTextField.isReadOnly = true;
+
+            m_SelectBuildButton = root.Q<Button>("select-build-file-button");
+            m_SelectBuildButton.clicked += () =>
+            {
+                var path = EditorUtility.OpenFilePanel("Select build ZIP file", "", "zip");
+                if (path.Length != 0)
+                {
+                    m_SelectedBuildPathTextField.value = path;
+                }
+            };
 
             SetFieldsFromPlayerPreferences();
 
@@ -206,6 +245,11 @@ namespace UnityEditor.Perception.Dsaas
             m_DsaasSelectedTemplateVersionsListView.selectionType = SelectionType.Single;
             m_DsaasSelectedTemplateVersionsListView.makeItem = MakeItem;
             m_DsaasSelectedTemplateVersionsListView.bindItem = BindItem;
+        }
+
+        void ApplyNewBuildCreationState()
+        {
+            m_BuildSelectControls.SetEnabled(!m_CreateNewBuildToggle.value);
         }
 
         async void SelectedTemplateChanged(List<object> objs)
@@ -270,21 +314,26 @@ namespace UnityEditor.Perception.Dsaas
         }
         async void UploadToDsaas()
         {
-            m_BuildParameters = new BuildParameters
-            {
-                scenarioConfig = (TextAsset)m_ScenarioConfigField.value,
-                currentOpenScenePath = SceneManager.GetSceneAt(0).path,
-                currentScenario = FindObjectOfType<ScenarioBase>(),
-                buildName = m_BuildNameField.value
-            };
+            m_UploadingBuildLabel.style.display = DisplayStyle.Flex;
 
             //TODO: analytics for upload attempt start
 
             try
             {
-                ValidateSettings();
+                if (m_CreateNewBuildToggle.value)
+                {
+                    m_BuildParameters = new BuildParameters
+                    {
+                        scenarioConfig = (TextAsset)m_ScenarioConfigField.value,
+                        currentOpenScenePath = SceneManager.GetSceneAt(0).path,
+                        currentScenario = FindObjectOfType<ScenarioBase>(),
+                        buildName = m_BuildNameField.value
+                    };
+                    ValidateSettings();
+                }
 
-                await DsaasUploadBuildToTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId);
+
+                await DsaasUploadBuildToTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, m_CreateNewBuildToggle.value);
 
                 //SetDsaasEnvVars();
                 //await UploadAsDsaasTemplate();
@@ -303,14 +352,21 @@ namespace UnityEditor.Perception.Dsaas
             catch (Exception e)
             {
                 EditorUtility.ClearProgressBar();
+
                 //PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
                 throw;
+            }
+            finally
+            {
+                m_UploadingBuildLabel.style.display = DisplayStyle.None;
             }
         }
 
         async void CreateDsaasRun()
         {
+            m_CreatingRunLabel.style.display = DisplayStyle.Flex;
             await DsaasCreateRunForTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, 100);
+            m_CreatingRunLabel.style.display = DisplayStyle.None;
         }
 
         void SetDsaasEnvVars()
@@ -353,22 +409,21 @@ namespace UnityEditor.Perception.Dsaas
 
         async void CreateTemplateBtnPressed()
         {
+            m_CreatingTemplateLabel.style.display = DisplayStyle.Flex;
             await DsaasCreateTemplate(m_NewTemplateTitle.text, m_NewTemplateDescription.text, m_NewTemplateIsPublic.value);
+            m_CreatingTemplateLabel.style.display = DisplayStyle.None;
         }
 
         async void CreateTemplateVersionBtnPressed()
         {
-            await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>());
+            m_CreatingTemplateVersionLabel.style.display = DisplayStyle.Flex;
+            await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, m_NewVersionPublish.value, new List<KeyValuePair<string, string>>());
+            m_CreatingTemplateVersionLabel.style.display = DisplayStyle.None;
         }
         void RefreshLists()
         {
             m_DsaasTemplatesListView.Refresh();
             m_DsaasSelectedTemplateVersionsListView.Refresh();
-        }
-
-        void RefreshUI()
-        {
-            RefreshLists();
         }
 
         async Task DsaasRefreshTemplates()
@@ -548,12 +603,19 @@ namespace UnityEditor.Perception.Dsaas
             }
         }
 
-        async Task DsaasUploadBuildToTemplateVersion(string templateId, string templateVersionId)
+        async Task DsaasUploadBuildToTemplateVersion(string templateId, string templateVersionId, bool createNewBuild)
         {
-            CreateLinuxBuildAndZip();
+            if (createNewBuild)
+            {
+                CreateLinuxBuildAndZip();
+                var projectBuildDirectory = $"{m_BuildDirectory}/{m_BuildNameField.value}";
+                m_BuildZipPath = projectBuildDirectory + ".zip";
 
-            var projectBuildDirectory = $"{m_BuildDirectory}/{m_BuildNameField.value}";
-            m_BuildZipPath = projectBuildDirectory + ".zip";
+            }
+            else
+            {
+                m_BuildZipPath = m_SelectedBuildPathTextField.value;
+            }
 
             m_HttpClient.DefaultRequestHeaders.Clear();
             m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
@@ -562,7 +624,7 @@ namespace UnityEditor.Perception.Dsaas
 
             var uploadUrlRequest = new DsaasGenerateUploadUrlRequest()
             {
-                filename = "test.zip"
+                filename = m_BuildNameField.value + ".zip"
             };
 
             var uploadUrl = string.Empty;
@@ -642,6 +704,7 @@ namespace UnityEditor.Perception.Dsaas
                 HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
                 if (httpResponse.IsSuccessStatusCode)
                 {
+                    Debug.Log("Run created!");
                 }
                 else
                 {
@@ -686,9 +749,10 @@ namespace UnityEditor.Perception.Dsaas
             if (summary.result != BuildResult.Succeeded)
                 throw new Exception($"The Linux build did not succeed: status = {summary.result}");
 
-            EditorUtility.DisplayProgressBar("Unity Simulation Run", "Zipping Linux build...", 0f);
+            //EditorUtility.DisplayProgressBar("Unity Simulation Run", "Zipping Linux build...", 0f);
             Zip.DirectoryContents(projectBuildDirectory, m_BuildParameters.buildName);
             m_BuildZipPath = projectBuildDirectory + ".zip";
+            //EditorUtility.ClearProgressBar();
         }
 
 
