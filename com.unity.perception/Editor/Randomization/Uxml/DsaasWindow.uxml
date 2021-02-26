@@ -1,46 +1,59 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
     <ui:VisualElement>
-        <Style src="/Packages/com.unity.perception/Editor/Randomization/Uss/DsaasWindowStyles.uss" />
-        <ui:TextField name="auth-token" label="USim Auth Token" />
-        <ui:VisualElement style="padding: 10px; margin: 5px; flex-grow: 1;">
-            <ui:Button name="refresh-templates-button" text="Refresh DSaaS Templates" style="height: 30px; margin: 0;" />
-            <ui:Label text="Refreshing DSaaS Templates..." name="refreshing" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
-            <ui:Label text="DSaaS Templates" class="title-label" />
-            <ui:VisualElement class="list-view-container">
-                <ui:ListView name="dsaas-templates" style="height: 200px; flex-grow: 1; border-width: 1px;" />
-            </ui:VisualElement>
-            <ui:Label text="Create New Template" class="title-label" style="margin-top: 7px;" />
-            <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
-                <ui:Label text="Title:" />
-                <ui:TextField name="new-template-title" style="width: 100px;" />
-                <ui:Label text="Description:" />
-                <ui:TextField name="new-template-description" style="width: 340px;" />
-                <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
-                <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
-                    <ui:Button name="create-template-button" text="Create" style="margin: 0;" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:Label text="Creating New Template..." name="creating-template" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
-            <ui:VisualElement name="versions-container" style="display: none; margin-top: 15px;">
-                <ui:Label text="Versions of Selected Template:" class="title-label" />
-                <ui:Label name="selected-template-id" />
-                <ui:VisualElement class="list-view-container">
-                    <ui:Label name="no-versions" text="Selected template has no versions." style="color: red;" />
-                    <ui:ListView name="dsaas-versions" style="flex-grow: 1; height: 200px;" />
-                </ui:VisualElement>
-                <ui:Label text="Create New Version for Selected Template" class="title-label" style="margin-top: 7px;" />
-                <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
-                    <ui:Toggle name="version-publish-toggle" text="Publish Version" style="height: 14px; width: 120px;" />
-                    <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
-                        <ui:Button name="create-template-version-button" text="Create" style="margin: 0;" />
+        <Style src="../Uss/DsaasWindowStyles.uss" />
+        <ui:TextField name="auth-token" label="USim Auth Token" style="margin-left: 16px; margin-right: 16px; margin-top: 10px;" />
+        <ui:VisualElement style="padding: 10px; margin: 5px; flex-grow: 1; margin-top: 0; margin-bottom: 0;">
+            <ui:VisualElement class="section-container" style="margin-top: 0;">
+                <ui:Button name="refresh-templates-button" text="Refresh DSaaS Data" style="height: 30px; margin: 0;" />
+                <ui:Label name="refreshing" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
+                <ui:VisualElement name="templates-inner-section">
+                    <ui:Label text="DSaaS Templates" class="title-label"/>
+                    <ui:VisualElement class="list-view-container">
+                        <ui:ListView name="dsaas-templates" style="height: 200px; flex-grow: 1; border-width: 1px;" />
                     </ui:VisualElement>
+                    <ui:Label text="Create New Template" class="title-label" style="margin-top: 7px;" />
+                    <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
+                        <ui:Label text="Title:" />
+                        <ui:TextField name="new-template-title" style="width: 100px;" />
+                        <ui:Label text="Description:" />
+                        <ui:TextField name="new-template-description" style="width: 340px;" />
+                        <ui:Toggle name="template-public-toggle" text="Is Public" style="height: 14px; width: 79px;" />
+                        <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
+                            <ui:Button name="create-template-button" text="Create" style="margin: 0;" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Label name="template-operations-status" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center;" />
                 </ui:VisualElement>
-                <ui:Label text="Creating New Template Version..." name="creating-template-version" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+            </ui:VisualElement>
+            <ui:VisualElement class="section-container">
+                <ui:VisualElement name="versions-container">
+                    <ui:Label text="Versions of Selected Template:" class="title-label" />
+                    <ui:VisualElement style="flex-direction: row; margin-bottom: 3px; align-items: center;">
+                        <ui:Label name="selected-template-id" text="Selected template ID: (no template selected)" />
+                        <ui:Button name="copy-template-id" text="Copy ID" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="list-view-container">
+                        <ui:Label name="no-versions" text="Selected template has no versions." style="color: red;" />
+                        <ui:ListView name="dsaas-versions" style="flex-grow: 1; height: 200px;" />
+                    </ui:VisualElement>
+                    <ui:Label text="Create New Version for Selected Template" class="title-label" style="margin-top: 7px;" />
+                    <ui:VisualElement class="list-view-container" style="align-items: center; flex-direction: row; justify-content: flex-end;">
+                        <uie:PropertyField name="keyvalue-list" label="Tags (key-value list with elements formatted as &quot;key&quot;,&quot;value&quot;)" binding-path="newVersionKeyValueList" style="width: 500px;" />
+                        <ui:Toggle name="version-publish-toggle" text="Publish Version" style="height: 14px; width: 120px;" />
+                        <ui:VisualElement style="align-items: flex-end; flex-direction: row;">
+                            <ui:Button name="create-template-version-button" text="Create" style="margin: 0;" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Label name="template-version-operations-status" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: center; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement name="upload-section" style="border-color: grey; border-radius: 10px; padding: 6px; margin: 5px; padding-bottom: 0;">
+        <ui:VisualElement name="upload-section" class="section-container" style="margin-left: 15px; margin-right: 15px; flex-grow: 1; padding-top: 2px;">
             <ui:Label text="Upload Build to Selected Template Version" class="title-label" />
-            <ui:Label name="selected-version-id" />
+            <ui:VisualElement style="flex-direction: row; margin-bottom: 3px; align-items: center;">
+                <ui:Label name="selected-version-id" text="Selected template version ID: (no template version selected)" />
+                <ui:Button name="copy-template-version-id" text="Copy ID" />
+            </ui:VisualElement>
             <ui:VisualElement name="VisualElement" class="list-view-container">
                 <ui:Toggle name="create-new-build" text="Create New Build" />
                 <ui:VisualElement name="build-select-controls" style="margin-bottom: 10px;">
@@ -54,7 +67,8 @@
                 <ui:VisualElement style="align-items: center; margin-top: 0; justify-content: center;">
                     <ui:Button name="upload-button" text="Upload" style="justify-content: center; margin-top: 15px; align-items: center; width: 150px;" />
                 </ui:VisualElement>
-                <ui:Label text="Uploading Build..." name="uploading-build" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+                <ui:Label text="Build name cannot be empty" name="build-name-warning" style="-unity-font-style: bold; visibility: hidden; color: rgb(185, 0, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+                <ui:Label name="build-upload-status" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
             </ui:VisualElement>
             <ui:Label text="Run Selected Template Version" class="title-label" style="margin-top: 5px;" />
             <ui:VisualElement class="list-view-container" style="padding-bottom: 0;">
@@ -62,7 +76,8 @@
                 <ui:VisualElement style="align-items: center; margin-top: 15px;">
                     <ui:Button name="run-button" text="Run" style="align-items: center; width: 150px;" />
                 </ui:VisualElement>
-                <ui:Label text="Creating Run..." name="creating-run" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+                <ui:Label name="run-creation-status" style="-unity-font-style: bold; visibility: hidden; color: rgb(0, 185, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
+                <ui:Label text="Iterations should be a valid integer" name="iterations-warning" style="-unity-font-style: bold; visibility: hidden; color: rgb(185, 0, 0); align-content: flex-end; align-self: center; display: flex; align-items: flex-start; flex-grow: 0; justify-content: flex-start;" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

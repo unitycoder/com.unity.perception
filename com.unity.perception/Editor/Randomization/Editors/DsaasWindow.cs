@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Unity.Simulation.Client;
 using UnityEditor.Build.Reporting;
+using UnityEditor.Perception.Dsaas.API;
 using UnityEditor.Perception.Dsaas.DataModels;
 using UnityEditor.Perception.Randomization;
 using UnityEditor.UIElements;
@@ -23,58 +20,69 @@ namespace UnityEditor.Perception.Dsaas
 {
     class DsaasWindow : EditorWindow
     {
-        readonly HttpClient m_HttpClient = new HttpClient();
+        //use these fields temporarily to set cloud settings until DSaaS is available on production
+        const string k_OrgID = "20066313632537";
+        const string k_ProjectID = "f29ae914-a9d6-4e7a-970d-c6a6cc3139df";
 
         string m_BuildDirectory;
         string m_BuildZipPath;
-        SysParamDefinition[] m_SysParamDefinitions;
-        IntegerField m_InstanceCountField;
-        TextField m_BuildNameField;
-        ObjectField m_ScenarioConfigField;
-        Button m_UploadButton;
-        Button m_RunButton;
-        Label m_ProjectIdLabel;
+        string m_SelectedTemplateId;
+        string m_SelectedTemplateVersionId;
+        string m_AuthToken;
+
+        bool m_UploadInProgress;
+
         ListView m_DsaasTemplatesListView;
         ListView m_DsaasSelectedTemplateVersionsListView;
+
+        TextField m_BuildNameField;
+        TextField m_Iterations;
+        TextField m_NewTemplateTitle;
+        TextField m_NewTemplateDescription;
+        TextField m_SelectedBuildPathTextField;
+        TextField m_AuthTokenField;
+
+        Label m_ProjectIdLabel;
         Label m_DsaasSelectedTemplateIdLabel;
         Label m_DsaasSelectedVersionIdLabel;
         Label m_NoVersionsLabel;
         Label m_RefreshingLabel;
-        Label m_CreatingTemplateLabel;
-        Label m_CreatingTemplateVersionLabel;
-        Label m_CreatingRunLabel;
-        Label m_UploadingBuildLabel;
-        Button m_DsaasRefreshTemplatesButton;
-        Button m_DsaasCreateNewTemplate;
-        Button m_DsaasCreateNewTemplateVersion;
+        Label m_TemplateOperationStatus;
+        Label m_TemplateVersionOperationStatus;
+        Label m_RunCreationStatus;
+        Label m_BuildUploadStatus;
+        Label m_BuildNameWarningLabel;
+        Label m_IterationsWarning;
+
+        Button m_UploadButton;
+        Button m_RunButton;
+        Button m_RefreshTemplatesButton;
+        Button m_CreateNewTemplateButton;
+        Button m_CreateNewTemplateVersionButton;
         Button m_SelectBuildButton;
+        Button m_CopyTemplateIdButton;
+        Button m_CopyTemplateVersionIdButton;
+
         VisualElement m_VersionsContainer;
         VisualElement m_UploadSection;
         VisualElement m_BuildSelectControls;
-        TextField m_NewTemplateTitle;
-        TextField m_NewTemplateDescription;
-        TextField m_SelectedBuildPathTextField;
+        VisualElement m_TemplatesInnerSection;
+
         Toggle m_NewTemplateIsPublic;
         Toggle m_NewVersionPublish;
         Toggle m_CreateNewBuildToggle;
 
-
-        BuildParameters m_BuildParameters;
-
-        TextField m_AuthTokenField;
-
-        string m_AuthToken;
-        string m_OrgID = "20066313632537";
-        string m_StgUrl = "https://perception-api.stg.simulation.unity3d.com";
-        string m_ProjectID = "f29ae914-a9d6-4e7a-970d-c6a6cc3139df";
-        string m_SelectedTemplateId;
-        string m_SelectedTemplateVersionId;
-        bool m_UseProjectAccessToken = false;
+        ObjectField m_DsaasConfigField;
 
         List<DsaasTemplate> m_DsaasTemplates = new List<DsaasTemplate>();
-        Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
         List<DsaasTemplateVersion> m_DsaasSelectedTemplateVersions = new List<DsaasTemplateVersion>();
+        Dictionary<string, List<DsaasTemplateVersion>> m_DsaasTemplateVersions = new Dictionary<string, List<DsaasTemplateVersion>>();
 
+        public List<string> newVersionKeyValueList;
+
+        CancellationTokenSource m_CancellationTokenSource = new CancellationTokenSource();
+
+        BuildParameters m_BuildParameters;
 
         [MenuItem("Window/Upload to DSaaS...")]
         static void ShowWindow()
@@ -92,16 +100,6 @@ namespace UnityEditor.Perception.Dsaas
             Project.Activate();
             Project.clientReadyStateChanged += CreateEstablishingConnectionUI;
             CreateEstablishingConnectionUI(Project.projectIdState);
-        }
-
-        void OnFocus()
-        {
-            Application.runInBackground = true;
-        }
-
-        void OnLostFocus()
-        {
-            Application.runInBackground = false;
         }
 
         void CreateEstablishingConnectionUI(Project.State state)
@@ -137,8 +135,11 @@ namespace UnityEditor.Perception.Dsaas
             m_RunButton = root.Q<Button>("run-button");
             m_RunButton.clicked += CreateDsaasRun;
 
-            m_ScenarioConfigField = root.Q<ObjectField>("dsaas-config");
-            m_ScenarioConfigField.objectType = typeof(TextAsset);
+            m_TemplatesInnerSection = root.Q<VisualElement>("templates-inner-section");
+            m_TemplatesInnerSection.SetEnabled(false);
+
+            m_DsaasConfigField = root.Q<ObjectField>("dsaas-config");
+            m_DsaasConfigField.objectType = typeof(TextAsset);
 
             m_BuildNameField = root.Q<TextField>("run-name");
 
@@ -155,26 +156,41 @@ namespace UnityEditor.Perception.Dsaas
             m_DsaasSelectedVersionIdLabel = root.Q<Label>("selected-version-id");
 
             m_NoVersionsLabel = root.Q<Label>("no-versions");
+            m_NoVersionsLabel.style.display = DisplayStyle.None;
 
             m_RefreshingLabel = root.Q<Label>("refreshing");
-            m_CreatingTemplateLabel = root.Q<Label>("creating-template");
-            m_CreatingTemplateVersionLabel = root.Q<Label>("creating-template-version");
-            m_CreatingRunLabel = root.Q<Label>("creating-run");
-            m_UploadingBuildLabel = root.Q<Label>("uploading-build");
+            m_TemplateOperationStatus = root.Q<Label>("template-operations-status");
+            m_TemplateVersionOperationStatus = root.Q<Label>("template-version-operations-status");
+            m_RunCreationStatus = root.Q<Label>("run-creation-status");
+            m_BuildUploadStatus = root.Q<Label>("build-upload-status");
+            m_BuildNameWarningLabel = root.Q<Label>("build-name-warning");
+            m_IterationsWarning = root.Q<Label>("iterations-warning");
 
-            m_DsaasRefreshTemplatesButton = root.Q<Button>("refresh-templates-button");
-            m_DsaasRefreshTemplatesButton.clicked += RefreshTemplatesBtnClicked;
+            m_RefreshTemplatesButton = root.Q<Button>("refresh-templates-button");
+            m_RefreshTemplatesButton.clicked += RefreshTemplatesBtnClicked;
+
+            m_CopyTemplateIdButton = root.Q<Button>("copy-template-id");
+            m_CopyTemplateIdButton.clicked += () =>
+            {
+                GUIUtility.systemCopyBuffer = m_SelectedTemplateId;
+            };
+            m_CopyTemplateVersionIdButton = root.Q<Button>("copy-template-version-id");
+            m_CopyTemplateVersionIdButton.clicked += () =>
+            {
+                GUIUtility.systemCopyBuffer = m_SelectedTemplateVersionId;
+            };
 
             m_VersionsContainer = root.Q<VisualElement>("versions-container");
+            m_VersionsContainer.SetEnabled(false);
 
             m_UploadSection = root.Q<VisualElement>("upload-section");
             m_UploadSection.SetEnabled(false);
 
-            m_DsaasCreateNewTemplate = root.Q<Button>("create-template-button");
-            m_DsaasCreateNewTemplate.clicked += CreateTemplateBtnPressed;
+            m_CreateNewTemplateButton = root.Q<Button>("create-template-button");
+            m_CreateNewTemplateButton.clicked += CreateTemplateBtnPressed;
 
-            m_DsaasCreateNewTemplateVersion = root.Q<Button>("create-template-version-button");
-            m_DsaasCreateNewTemplateVersion.clicked += CreateTemplateVersionBtnPressed;
+            m_CreateNewTemplateVersionButton = root.Q<Button>("create-template-version-button");
+            m_CreateNewTemplateVersionButton.clicked += CreateTemplateVersionBtnPressed;
 
             m_NewTemplateTitle = root.Q<TextField>("new-template-title");
             m_NewTemplateDescription = root.Q<TextField>("new-template-description");
@@ -208,11 +224,13 @@ namespace UnityEditor.Perception.Dsaas
                 }
             };
 
-            SetFieldsFromPlayerPreferences();
+            m_Iterations = root.Q<TextField>("iterations");
 
+            root.Q<PropertyField>("keyvalue-list").Bind(new SerializedObject(this));
+
+            SetFieldsFromPlayerPreferences();
             SetupTemplatesList();
             SetupTemplateVersionsList();
-
             SetDsaasEnvVars();
         }
 
@@ -249,13 +267,18 @@ namespace UnityEditor.Perception.Dsaas
 
         void ApplyNewBuildCreationState()
         {
+            m_BuildNameWarningLabel.visible = false;
             m_BuildSelectControls.SetEnabled(!m_CreateNewBuildToggle.value);
+            m_BuildNameField.SetEnabled(m_CreateNewBuildToggle.value);
         }
 
         async void SelectedTemplateChanged(List<object> objs)
         {
             DisableUploadSectionUI();
-            //m_DsaasSelectedTemplateVersionsListView.selectedIndex = 0;
+            m_TemplateOperationStatus.visible = false;
+            m_RunCreationStatus.visible = false;
+            m_TemplateVersionOperationStatus.visible = false;
+            m_BuildUploadStatus.visible = false;
 
             var selectedTemplate = m_DsaasTemplates[m_DsaasTemplatesListView.selectedIndex];
 
@@ -263,26 +286,25 @@ namespace UnityEditor.Perception.Dsaas
 
             m_DsaasSelectedTemplateIdLabel.text = "Selected template id: " + selectedTemplate.id;
 
-
             if (!m_DsaasTemplateVersions.TryGetValue(selectedTemplate.id, out var versions))
             {
-                await DsaasRefreshTemplateVersions(selectedTemplate.id);
                 //the template versions should have already been downloaded, but try once more just in case there was an issue before
+                var success = await RefreshTemplateVersions(selectedTemplate.id);
 
-                if (m_DsaasTemplateVersions.ContainsKey(selectedTemplate.id))
+                if (success)
                 {
                     versions = m_DsaasTemplateVersions[selectedTemplate.id];
                 }
                 else
                 {
-                    m_VersionsContainer.style.display = DisplayStyle.None;
+                    m_VersionsContainer.SetEnabled(false);
 
                     //TODO: throw exception
                     return;
                 }
             }
 
-            m_VersionsContainer.style.display = DisplayStyle.Flex;
+            m_VersionsContainer.SetEnabled(true);
             m_NoVersionsLabel.style.display = versions.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
             m_DsaasSelectedTemplateVersions.Clear();
             m_DsaasSelectedTemplateVersions.AddRange(versions);
@@ -312,61 +334,101 @@ namespace UnityEditor.Perception.Dsaas
             m_UploadSection.SetEnabled(false);
             m_DsaasSelectedVersionIdLabel.text = "Selected template version id: ";
         }
+
         async void UploadToDsaas()
         {
-            m_UploadingBuildLabel.style.display = DisplayStyle.Flex;
-
-            //TODO: analytics for upload attempt start
-
-            try
+            if (m_UploadInProgress)
             {
+                m_UploadButton.text = "Upload";
+                m_BuildUploadStatus.style.color = Color.red;
+                m_BuildUploadStatus.text = "Upload cancelled.";
+                m_CancellationTokenSource.Cancel();
+                m_UploadInProgress = false;
+            }
+            else
+            {
+                m_UploadInProgress = true;
+
+                m_BuildUploadStatus.style.color = Color.green;
+
+                m_BuildUploadStatus.visible = true;
+                m_BuildNameWarningLabel.visible = false;
+
+                //TODO: analytics for upload attempt start
+
                 if (m_CreateNewBuildToggle.value)
                 {
+                    if (string.IsNullOrEmpty(m_BuildNameField.value))
+                    {
+                        m_BuildUploadStatus.visible = false;
+                        m_BuildNameWarningLabel.visible = true;
+                        m_UploadInProgress = false;
+                        return;
+                    }
+
+                    m_BuildUploadStatus.text = "Creating and uploading new build...";
+
                     m_BuildParameters = new BuildParameters
                     {
-                        scenarioConfig = (TextAsset)m_ScenarioConfigField.value,
+                        dsaasConfig = (TextAsset)m_DsaasConfigField.value,
                         currentOpenScenePath = SceneManager.GetSceneAt(0).path,
                         currentScenario = FindObjectOfType<ScenarioBase>(),
                         buildName = m_BuildNameField.value
                     };
                     ValidateSettings();
+
+                    CreateLinuxBuildAndZip();
+                    var projectBuildDirectory = $"{m_BuildDirectory}/{m_BuildNameField.value}";
+                    m_BuildZipPath = projectBuildDirectory + ".zip";
+                }
+                else
+                {
+                    m_BuildZipPath = m_SelectedBuildPathTextField.value;
+                    m_BuildUploadStatus.text = "Uploading selected build...";
                 }
 
+                m_UploadButton.text = "Cancel Upload";
 
-                await DsaasUploadBuildToTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, m_CreateNewBuildToggle.value);
+                var cancellationToken = m_CancellationTokenSource.Token;
 
-                //SetDsaasEnvVars();
-                //await UploadAsDsaasTemplate();
-                //await DsaasRefreshTemplates();
-                //await DsaasCreateTemplate("test template 1", "helo helo heloooo", true);
-                //await DsaasRefreshTemplateVersions(m_TemplateId);
-                // await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, true, new List<KeyValuePair<string, string>>
-                // {
-                //     new KeyValuePair<string, string>("testK3","testV3"),
-                //     new KeyValuePair<string, string>("testK23","testV23")
-                // });
-                //await UploadBuildToDsaasTemplateVersion(m_TemplateId, m_TemplateVersionId);
+                var success = await DsaasAPI.DsaasUploadBuildToTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, m_BuildZipPath, cancellationToken);
 
-                //await StartUnitySimulationRun(runGuid);
-            }
-            catch (Exception e)
-            {
-                EditorUtility.ClearProgressBar();
+                if (success)
+                {
+                    m_BuildUploadStatus.text = "Build uploaded successfully";
+                }
+                else
+                {
+                    m_BuildUploadStatus.text = "Build upload failed. Check the Console for more information";
+                    m_BuildUploadStatus.style.color = Color.red;
+                }
 
-                //PerceptionEditorAnalytics.ReportRunInUnitySimulationFailed(runGuid, e.Message);
-                throw;
-            }
-            finally
-            {
-                m_UploadingBuildLabel.style.display = DisplayStyle.None;
+                m_UploadInProgress = false;
             }
         }
 
         async void CreateDsaasRun()
         {
-            m_CreatingRunLabel.style.display = DisplayStyle.Flex;
-            await DsaasCreateRunForTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, 100);
-            m_CreatingRunLabel.style.display = DisplayStyle.None;
+            m_IterationsWarning.visible = false;
+            if (!int.TryParse(m_Iterations.value, out int iterations))
+            {
+                m_IterationsWarning.visible = true;
+                return;
+            }
+
+            m_RunCreationStatus.visible = true;
+            m_RunCreationStatus.style.color = Color.green;
+            var success = await DsaasAPI.DsaasCreateRunForTemplateVersion(m_SelectedTemplateId, m_SelectedTemplateVersionId, iterations);
+
+            if (success)
+            {
+                m_RunCreationStatus.text = "Run created successfully";
+            }
+            else
+            {
+                m_RunCreationStatus.text = "Run creation failed. Check the Console for more information.";
+                m_RunCreationStatus.style.color = Color.red;
+            }
         }
 
         void SetDsaasEnvVars()
@@ -377,349 +439,180 @@ namespace UnityEditor.Perception.Dsaas
                 PlayerPrefs.SetString("latestDsaasAuthToken", m_AuthToken);
             }
 
+
+            DsaasAPI.SetServerUrl("https://perception-api.stg.simulation.unity3d.com");
+            DsaasAPI.SetOrgID(k_OrgID);
+            DsaasAPI.SetProjectID(k_ProjectID);
+            DsaasAPI.SetAuthToken(m_AuthToken);
+
             m_SelectedTemplateId = "24c233a5-b9f9-4fd1-ba6d-eb8bde5abd46";
             m_SelectedTemplateVersionId = "f34767a1-cc79-41c6-ad91-88d73bedb6ec";
         }
 
-        struct DsaasGenerateUploadUrlRequest
-        {
-            public string filename;
-        }
-
         async void RefreshTemplatesBtnClicked()
         {
-            m_RefreshingLabel.style.visibility = Visibility.Visible;
+            m_RefreshingLabel.style.color = Color.green;
+            m_RefreshingLabel.text = "Refreshing DSaaS templates and their versions...";
+            m_RefreshingLabel.visible = true;
 
             m_DsaasTemplatesListView.SetEnabled(false);
             m_DsaasSelectedTemplateVersionsListView.SetEnabled(false);
 
+            var success = await RefreshDsaasTemplates();
+
+            if (success)
+            {
+                RefreshLists();
+                m_TemplatesInnerSection.SetEnabled(true);
+                m_DsaasTemplatesListView.SetEnabled(true);
+                m_DsaasSelectedTemplateVersionsListView.SetEnabled(true);
+                m_RefreshingLabel.visible = false;
+            }
+        }
+
+        async Task<bool> RefreshDsaasTemplates()
+        {
             SetDsaasEnvVars();
-            await DsaasRefreshTemplates();
+            var templates = await DsaasAPI.DsaasGetTemplates();
+
+            if (templates != null)
+            {
+                m_DsaasTemplates.Clear();
+                m_DsaasTemplates.AddRange(templates);
+            }
+            else
+            {
+                m_RefreshingLabel.style.color = Color.red;
+                m_RefreshingLabel.text = "Failed to refresh templates. Check the Console for more information.";
+                return false;
+            }
+
             foreach (var template in m_DsaasTemplates)
             {
-                await DsaasRefreshTemplateVersions(template.id);
+                var success = await RefreshTemplateVersions(template.id);
+                if (!success)
+                {
+                    m_RefreshingLabel.style.color = Color.red;
+                    m_RefreshingLabel.text = $"Failed to refresh versions for one or more templates. Check the Console for more information.";
+                    return false;
+                }
             }
-            RefreshLists();
 
-            m_DsaasTemplatesListView.SetEnabled(true);
-            m_DsaasSelectedTemplateVersionsListView.SetEnabled(true);
+            return true;
+        }
 
-            m_RefreshingLabel.style.visibility = Visibility.Hidden;
+        async Task<bool> RefreshTemplateVersions(string templateId)
+        {
+            var versions = await DsaasAPI.DsaasGetTemplateVersions(templateId);
+
+            if (versions != null)
+            {
+                m_DsaasTemplateVersions[templateId] = new List<DsaasTemplateVersion>();
+                m_DsaasTemplateVersions[templateId].AddRange(versions);
+                return true;
+            }
+
+            return false;
         }
 
         async void CreateTemplateBtnPressed()
         {
-            m_CreatingTemplateLabel.style.display = DisplayStyle.Flex;
-            await DsaasCreateTemplate(m_NewTemplateTitle.text, m_NewTemplateDescription.text, m_NewTemplateIsPublic.value);
-            m_CreatingTemplateLabel.style.display = DisplayStyle.None;
+            m_TemplateOperationStatus.style.color = Color.green;
+            m_TemplateOperationStatus.text = "Creating new template...";
+            m_TemplateOperationStatus.visible = true;
+
+            var newTemplateId = await DsaasAPI.DsaasCreateTemplate(m_NewTemplateTitle.text, m_NewTemplateDescription.text, m_NewTemplateIsPublic.value);
+
+            if (!string.IsNullOrEmpty(newTemplateId))
+            {
+                m_TemplateOperationStatus.text = "New template created successfully";
+                await RefreshDsaasTemplates();
+                await RefreshTemplateVersions(newTemplateId);
+                RefreshLists();
+            }
+            else
+            {
+                m_TemplateOperationStatus.style.color = Color.red;
+                m_TemplateOperationStatus.text = "Template creation failed. Check the Console for more information.";
+            }
         }
 
         async void CreateTemplateVersionBtnPressed()
         {
-            m_CreatingTemplateVersionLabel.style.display = DisplayStyle.Flex;
-            await DsaasCreateNewTemplateVersion(m_SelectedTemplateId, m_NewVersionPublish.value, new List<KeyValuePair<string, string>>());
-            m_CreatingTemplateVersionLabel.style.display = DisplayStyle.None;
+            m_TemplateVersionOperationStatus.style.color = Color.green;
+            m_TemplateVersionOperationStatus.text = "Creating new template version...";
+            m_TemplateVersionOperationStatus.visible = true;
+
+            var tags = ParseKeyValueList();
+
+            if (tags == null)
+            {
+                m_TemplateVersionOperationStatus.style.color = Color.red;
+                m_TemplateVersionOperationStatus.text = $"Failed to create new template version. Provided tag list has invalid format.";
+                return;
+            }
+
+            var currentScenario = FindObjectOfType<ScenarioBase>();
+
+            if (!currentScenario)
+            {
+                m_TemplateVersionOperationStatus.style.color = Color.red;
+                m_TemplateVersionOperationStatus.text = $"Failed to create new template version. No Scenario was found in the active Scene.";
+                return;
+            }
+
+            var config = JObject.Parse(currentScenario.SerializeToJson()).GetValue("randomizers");
+
+            //TODO: Should a user-specified config be accepted here? Or is the one supplied at the build upload stage is sufficient?
+
+            var newTemplateVersionId = await DsaasAPI.DsaasCreateNewTemplateVersion(m_SelectedTemplateId, m_NewVersionPublish.value, config, tags);
+
+            if (!string.IsNullOrEmpty(newTemplateVersionId))
+            {
+                m_TemplateVersionOperationStatus.text = "New template version created successfully";
+                await RefreshTemplateVersions(m_SelectedTemplateId);
+                SelectedTemplateChanged(null);
+                m_TemplateVersionOperationStatus.visible = true;
+                RefreshLists();
+            }
+            else
+            {
+                m_TemplateVersionOperationStatus.style.color = Color.red;
+                m_TemplateVersionOperationStatus.text = $"Failed to create new template version. Check the Console for more information.";
+            }
         }
+
+        List<KeyValuePair<string, string>> ParseKeyValueList()
+        {
+            var result = new List<KeyValuePair<string, string>>();
+
+            foreach (var kv in newVersionKeyValueList)
+            {
+                var split = kv.Split(',');
+                if (split.Length != 2 || split[0].Length < 3 || split[1].Length < 3 ||
+                    !split[0].StartsWith("\"") || !split[0].EndsWith("\"") ||
+                    !split[1].StartsWith("\"") || !split[1].EndsWith("\""))
+                {
+                    m_TemplateVersionOperationStatus.text = "Provided key-value pair has invalid format: " + kv;
+                    m_TemplateVersionOperationStatus.style.color = Color.red;
+                    return null;
+                }
+
+                var key = split[0].Substring(1, split[0].Length - 2);
+                var value = split[1].Substring(1, split[1].Length - 2);
+
+                result.Add(new KeyValuePair<string, string>(key, value));
+            }
+
+            return result;
+        }
+
         void RefreshLists()
         {
             m_DsaasTemplatesListView.Refresh();
             m_DsaasSelectedTemplateVersionsListView.Refresh();
         }
 
-        async Task DsaasRefreshTemplates()
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.GetAsync(requestUri);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    m_DsaasTemplates.Clear();
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    m_DsaasTemplates.AddRange(JsonConvert.DeserializeObject<List<DsaasTemplate>>(((JObject)responseJson.GetValue("object"))?.GetValue("templates").ToString()));
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-                Debug.LogError(e.StackTrace);
-            }
-        }
-
-        async Task DsaasRefreshTemplateVersions(string templateId)
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.GetAsync(requestUri);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    if (m_DsaasTemplateVersions.ContainsKey(templateId))
-                    {
-                        m_DsaasTemplateVersions[templateId].Clear();
-                    }
-                    else
-                    {
-                        m_DsaasTemplateVersions[templateId] = new List<DsaasTemplateVersion>();
-                    }
-
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    var versions = ((JObject)responseJson.GetValue("object"))?.GetValue("versions");
-
-                    if (versions != null && versions.HasValues)
-                    {
-                        m_DsaasTemplateVersions[templateId].AddRange(JsonConvert.DeserializeObject<List<DsaasTemplateVersion>>(versions.ToString()));
-                    }
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasCreateTemplate(string templateTitle, string templateDescription, bool isTemplatePublic)
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/");
-
-            var request = new DsaasCreateTemplateRequest
-            {
-                title = templateTitle,
-                description = templateDescription,
-                isPublic = isTemplatePublic
-            };
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    var templateId = httpResponse.Headers.Location.Segments.Last();
-                    await DsaasRefreshTemplates();
-                    await DsaasRefreshTemplateVersions(templateId);
-                    RefreshLists();
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasCreateNewTemplateVersion(string templateId, bool published, List<KeyValuePair<string,string>> tags = null)
-        {
-            await DsaasRefreshTemplateVersions(templateId);
-
-            var currentScenario = FindObjectOfType<ScenarioBase>();
-
-            if (!currentScenario)
-            {
-                //Todo: throw exception
-                Debug.Log("No scenario was found.");
-                return;
-            }
-
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions");
-
-            if (!m_DsaasTemplateVersions.TryGetValue(templateId, out var versions))
-            {
-                //TODO: throw exception
-                Debug.Log("Could not retrieve versions list for requested template.");
-                return;
-            }
-
-            versions = versions.OrderByDescending(ver => ver.version).ToList();
-            string newVersionString;
-
-            if (versions.Count != 0)
-            {
-                var currentVersionString = versions.First().version;
-                var currentVersionNumber = float.Parse(currentVersionString.Substring(1));
-                var newVersionNumber = currentVersionNumber + 0.1f;
-                newVersionString = $"v{newVersionNumber}";
-            }
-            else
-            {
-                newVersionString = "V1.0";
-            }
-
-            //TODO: figure out versioning scheme
-
-            var request = new DsaasCreateTemplateVersionRequest
-            {
-                published = published,
-                version = newVersionString,
-                tags = tags,
-                authorId = m_OrgID,
-                randomizers = JObject.Parse(currentScenario.SerializeToJson()).GetValue("randomizers")
-            };
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    //m_LatestCreatedTemplateVersionId = httpResponse.Headers.Location.Segments.Last();
-                    await DsaasRefreshTemplateVersions(templateId);
-                    SelectedTemplateChanged(null);
-                    RefreshLists();
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        async Task DsaasUploadBuildToTemplateVersion(string templateId, string templateVersionId, bool createNewBuild)
-        {
-            if (createNewBuild)
-            {
-                CreateLinuxBuildAndZip();
-                var projectBuildDirectory = $"{m_BuildDirectory}/{m_BuildNameField.value}";
-                m_BuildZipPath = projectBuildDirectory + ".zip";
-
-            }
-            else
-            {
-                m_BuildZipPath = m_SelectedBuildPathTextField.value;
-            }
-
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/templates/{templateId}/versions/{templateVersionId}:uploadUrl");
-
-            var uploadUrlRequest = new DsaasGenerateUploadUrlRequest()
-            {
-                filename = m_BuildNameField.value + ".zip"
-            };
-
-            var uploadUrl = string.Empty;
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(uploadUrlRequest), Encoding.UTF8, "application/json");
-            try
-            {
-                var httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    var responseString = httpResponse.Content.ReadAsStringAsync().Result;
-                    var responseJson = JObject.Parse(responseString);
-                    uploadUrl = responseJson.GetValue("url").ToString();
-                    Debug.Log("expires: " + responseJson.GetValue("expires"));
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-
-            if (!string.IsNullOrEmpty(uploadUrl))
-            {
-                var stream = File.OpenRead(m_BuildZipPath);
-                requestContents = new StreamContent(stream);
-                requestContents.Headers.Add("Content-Type", "application/zip");
-
-                try
-                {
-                    var httpResponse = await m_HttpClient.PutAsync(uploadUrl, requestContents);
-
-                    if (httpResponse.IsSuccessStatusCode)
-                    {
-                        Debug.Log("build uploaded!");
-                    }
-                    else
-                    {
-                        DsaasHandleErrors(httpResponse);
-                    }
-                }
-                catch (HttpRequestException e)
-                {
-                }
-            }
-        }
-
-        async Task DsaasCreateRunForTemplateVersion(string templateId, string templateVersionId, int iterations)
-        {
-            m_HttpClient.DefaultRequestHeaders.Clear();
-            m_HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", m_UseProjectAccessToken? Project.accessToken : m_AuthToken);
-
-            var requestUri = new Uri($"{m_StgUrl}/v1/organizations/{m_OrgID}/projects/{m_ProjectID}/runs");
-
-            var request = new DsaasCreateRunRequest()
-            {
-                assets = new List<string>(),
-                version = new DsaasRunRequestTemplateVersion()
-                {
-                    id = templateVersionId,
-                    templateId = templateId
-                },
-                runConfig = new DsaasRunConfig()
-                {
-                    iterations = iterations
-                },
-                randomizations = new JObject()
-            };
-
-            HttpContent requestContents = new StringContent(JsonConvert.SerializeObject(request), Encoding.UTF8, "application/json");
-
-            try
-            {
-                HttpResponseMessage httpResponse = await m_HttpClient.PostAsync(requestUri, requestContents);
-                if (httpResponse.IsSuccessStatusCode)
-                {
-                    Debug.Log("Run created!");
-                }
-                else
-                {
-                    DsaasHandleErrors(httpResponse);
-                }
-            }
-            catch (HttpRequestException e)
-            {
-            }
-        }
-
-        static void DsaasHandleErrors(HttpResponseMessage responseMessage)
-        {
-            Debug.LogError("DSaaS API call failed with reason: " + responseMessage.ReasonPhrase);
-        }
         void ValidateSettings()
         {
             if (string.IsNullOrEmpty(m_BuildParameters.currentOpenScenePath))
@@ -731,6 +624,10 @@ namespace UnityEditor.Perception.Dsaas
                 typeof(UnitySimulationScenario<>), m_BuildParameters.currentScenario.GetType()))
                 throw new NotSupportedException(
                     "Scenario class must be derived from UnitySimulationScenario to run in Unity Simulation");
+            if (m_BuildParameters.dsaasConfig != null &&
+                Path.GetExtension(m_BuildParameters.dsaasConfigAssetPath) != ".json")
+                throw new NotSupportedException(
+                    "DSaaS configuration must be a JSON text asset");
         }
 
         void CreateLinuxBuildAndZip()
@@ -749,22 +646,17 @@ namespace UnityEditor.Perception.Dsaas
             if (summary.result != BuildResult.Succeeded)
                 throw new Exception($"The Linux build did not succeed: status = {summary.result}");
 
-            //EditorUtility.DisplayProgressBar("Unity Simulation Run", "Zipping Linux build...", 0f);
             Zip.DirectoryContents(projectBuildDirectory, m_BuildParameters.buildName);
             m_BuildZipPath = projectBuildDirectory + ".zip";
-            //EditorUtility.ClearProgressBar();
         }
-
-
 
         struct BuildParameters
         {
-            public TextAsset scenarioConfig;
+            public TextAsset dsaasConfig;
             public string currentOpenScenePath;
             public ScenarioBase currentScenario;
             public string buildName;
-
-            public string scenarioConfigAssetPath => AssetDatabase.GetAssetPath(scenarioConfig);
+            public string dsaasConfigAssetPath => AssetDatabase.GetAssetPath(dsaasConfig);
         }
     }
 }

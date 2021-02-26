@@ -72,6 +72,12 @@ namespace UnityEditor.Perception.Dsaas.DataModels
     }
 
     [Serializable]
+    struct DsaasGenerateUploadUrlRequest
+    {
+        public string filename;
+    }
+
+    [Serializable]
     struct DsaasRunRequestTemplateVersion
     {
         public string id;
