@@ -16,6 +16,7 @@ namespace UnityEditor.Perception.Randomization
         {
             m_Property = property;
             this.randomizerList = randomizerList;
+
             m_Collapsed = property.FindPropertyRelative("collapsed");
             collapsed = m_Collapsed.boolValue;
 
@@ -32,7 +33,7 @@ namespace UnityEditor.Perception.Randomization
             collapseToggle.RegisterCallback<MouseUpEvent>(evt => collapsed = !collapsed);
 
             var enabledToggle = this.Q<Toggle>("enabled");
-            enabledToggle.BindProperty(property.FindPropertyRelative("<enabled>k__BackingField"));
+            enabledToggle.BindProperty(property.FindPropertyRelative("m_Enabled"));
 
             var removeButton = this.Q<Button>("remove");
             removeButton.clicked += () => randomizerList.RemoveRandomizer(this);
@@ -50,9 +51,12 @@ namespace UnityEditor.Perception.Randomization
 
         public bool collapsed
         {
-            get => m_Collapsed.boolValue;
+            get => m_Collapsed?.boolValue ?? true;
             set
             {
+                if (m_Collapsed == null)
+                    return;
+
                 m_Collapsed.boolValue = value;
                 m_Property.serializedObject.ApplyModifiedPropertiesWithoutUndo();
                 if (value)

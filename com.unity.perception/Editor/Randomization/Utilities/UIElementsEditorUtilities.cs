@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using UnityEditor.UIElements;
 using UnityEngine;
+using UnityEngine.Perception.Randomization.Randomizers.SampleRandomizers;
 using UnityEngine.UIElements;
 
 namespace UnityEditor.Perception.Randomization
@@ -40,7 +42,10 @@ namespace UnityEditor.Perception.Randomization
         /// <param name="containerElement">The element to place the created PropertyFields in</param>
         public static void CreatePropertyFields(SerializedProperty property, VisualElement containerElement)
         {
-            var fieldType = StaticData.GetManagedReferenceValue(property).GetType();
+            var obj = StaticData.GetManagedReferenceValue(property);
+            if (obj == null)
+                return;
+            var fieldType = obj.GetType();
             var iterator = property.Copy();
             var nextSiblingProperty = property.Copy();
             nextSiblingProperty.NextVisible(false);
@@ -66,7 +71,7 @@ namespace UnityEditor.Perception.Randomization
         {
             var propertyField = new PropertyField(iterator.Copy());
             propertyField.Bind(iterator.serializedObject);
-            var originalField = parentPropertyType.GetField(iterator.name);
+            var originalField = parentPropertyType.GetField(iterator.name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance );
             var tooltipAttribute = originalField.GetCustomAttributes(true)
                 .ToList().Find(att => att.GetType() == typeof(TooltipAttribute));
             if (tooltipAttribute != null)
